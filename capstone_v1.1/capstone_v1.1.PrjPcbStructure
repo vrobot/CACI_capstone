@@ -1,1 +1,2 @@
-Record=TopLevelDocument|FileName=capstone_v1.1.SchDoc|SheetNumber=1
+Record=TopLevelDocument|FileName=BreakoutPins.SchDoc|SheetNumber=2
+Record=NoMainPathDocument|SourceDocument=BreakoutPins.SchDoc|FileName=capstone_v1.1.SchDoc|SheetNumber=1
