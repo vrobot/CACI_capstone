@@ -1,0 +1,40 @@
+Removed Pin From Net: NetName=5V Pin=C15-1
+Removed Pin From Net: NetName=VDD Pin=C16-1
+Removed Pin From Net: NetName=GND Pin=C16-2
+Removed Pin From Net: NetName=GND Pin=U1-138
+Removed Pin From Net: NetName=5V Pin=U2-3
+Removed Pin From Net: NetName=VDD Pin=U2-5
+Removed Member From Class: ClassName=capstone_v1.1 Member=C16
+Change Component Footprint: Designator=U2 Old Footprint=FP-UJ-5-IPC_B New Footprint=SOT-223-DB3_L
+Change Component Comment : Designator=U2 Old Comment=3.3V Regulator New Comment=TC1108-3.3VDBTR
+Change Managed Component Library Link : Designator=U2 Old VaultGUID=B7D15EC3-160A-466F-A46C-7801FE6295A7 New VaultGUID=B7D15EC3-160A-466F-A46C-7801FE6295A7 Old ItemGUID=2E766CC9-C2FE-480C-A511-35ABE2FBF2A8 New ItemGUID=653C1923-A97B-4A21-99A0-F78505FAAD54 Old RevisionGUID=FDEC7443-E34B-48FA-ACF7-4C6E0ECBE041 New RevisionGUID=2900D26D-66E1-44B5-9727-ECA365006109
+Change component parameters: Designator = "U2" ("U2"); Footprint = "FP-UJ-5-IPC_B"; UniqueID = "\UOKIQKII" ("\UOKIQKII")
+Change component parameters (AddParameter): Name = "DatasheetVersion"; Value = "revB, 2002"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "PackageDescription"; Value = "3-Lead Plastic Small Outline Transistor (DB) [SOT-223]"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "PackageReference"; Value = "SOT-223-DB3"; VariantName = "[No Variations]"
+Change component parameters (AddParameter): Name = "PackageVersion"; Value = "revBB, Aug-2009"; VariantName = "[No Variations]"
+Added Component: Designator=R10(FP-HCJ0603-MFG)
+Add component (AddParameter): Name = "Case Code (Imperial)"; Value = "0603"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case Code (Metric)"; Value = "1608"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Case/Package"; Value = "0603"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Height"; Value = "0.021inch"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Length"; Value = "0.061inch"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Max Operating Temperature"; Value = "155°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Min Operating Temperature"; Value = "-55°C"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Mount"; Value = "Surface Mount"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Number of Terminations"; Value = "2"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Package Quantity"; Value = "5000"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Packaging"; Value = "Tape and Reel"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Radiation Hardening"; Value = "No"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Resistance"; Value = "0mR"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "RoHS Compliant"; Value = "Yes"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Termination"; Value = "Wraparound"; VariantName = "[No Variations]"
+Add component (AddParameter): Name = "Width"; Value = "0.031inch"; VariantName = "[No Variations]"
+Added Pin To Net: NetName=VDD Pin=C15-1
+Added Pin To Net: NetName=GND Pin=R10-2
+Added Pin To Net: NetName=VDD Pin=U2-3
+Added Pin To Net: NetName=GND Pin=U2-4
+Added Pin To Net: NetName=NetR10_1 Pin=R10-1
+Added Pin To Net: NetName=NetR10_1 Pin=U1-138
+Added Net: Name=NetR10_1
+Added Member To Class: ClassName=capstone_v1.1 Member=Component R10 HCJ0603ZT0R00
