@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "string.h"
 
 /* USER CODE END Includes */
 
@@ -50,19 +51,27 @@
 SAI_HandleTypeDef hsai_BlockB1;
 DMA_HandleTypeDef hdma_sai1_b;
 
+TIM_HandleTypeDef htim2;
+
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_uart4_rx;
 
 /* USER CODE BEGIN PV */
 volatile int32_t *_sampleBuffer[MIC_SAMPLES_PER_PACKET * 2];
 int8_t _processBuffer[MIC_SAMPLES_PER_PACKET];
 int8_t _sendBuffer[MIC_SAMPLES_PER_PACKET];
-int8_t circular_buf[MIC_SAMPLES_PER_PACKET*4];
-uint16_t head;
-uint16_t tail;
+int8_t circular_buf_mov[MIC_SAMPLES_PER_PACKET*4];
+uint16_t head_mov;
+uint16_t tail_mov;
+int8_t circular_buf_full[MIC_SAMPLES_PER_PACKET*16];
+uint16_t head_full;
+uint16_t tail_full;
 uint16_t moving_sum;
 float moving_avg;
 bool _running;
-int ready;
+uint16_t counter;
+int done;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,13 +80,21 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SAI1_Init(void);
+static void MX_UART4_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint32_t timerVal;
 
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+	timerVal = HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_3);
+	HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70);
+	__HAL_TIM_SET_COUNTER(htim,0);
+}
 /* USER CODE END 0 */
 
 /**
@@ -88,13 +105,19 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   _running = false;
-  head = 0;
-  tail = 1;
+  head_mov = 0;
+  tail_mov = 1;
+  head_full = 0;
+  tail_full = 1;
   moving_sum = 0;
   moving_avg = 0;
-  ready = 1;
+  counter = 0;
+  done = 0;
   for(int i = 0; i < (MIC_SAMPLES_PER_PACKET*4); i++){
-	  circular_buf[i] = 0;
+	  circular_buf_mov[i] = 0;
+  }
+  for(int i = 0; i < (MIC_SAMPLES_PER_PACKET*16); i++){
+	  circular_buf_full[i] = 0;
   }
   for(int i = 0; i < (MIC_SAMPLES_PER_PACKET * 2); i++){
 	  _sampleBuffer[i] = 0;
@@ -123,9 +146,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_DMA_Init();
   MX_SAI1_Init();
-
+  MX_UART4_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -224,6 +248,87 @@ static void MX_SAI1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_IC_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 9600;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -264,8 +369,12 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA2_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream4_IRQn);
@@ -321,22 +430,35 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
       int8_t *dest = _processBuffer;
 
       for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
+
         int8_t sample = ((data_in[0]>>16) & 0xff);
         moving_sum += abs(sample);
-        moving_sum -= abs(circular_buf[tail]);
-    	circular_buf[tail] = sample;
+        moving_sum -= abs(circular_buf_mov[tail_mov]);
+    	circular_buf_mov[tail_mov] = sample;
+    	circular_buf_full[tail_full] = sample;
     	moving_avg = ((float) moving_sum)/(MIC_SAMPLES_PER_PACKET*4);
-    	if ((moving_avg >= MOVING_AVG_THRESHOLD) && (ready == 1)){
-    	    if ((HAL_UART_Transmit(&huart2, circular_buf + tail, (MIC_SAMPLES_PER_PACKET*4)-tail, HAL_MAX_DELAY)) != HAL_OK){
-    	      Error_Handler();
-    	    }
-    	    if ((HAL_UART_Transmit(&huart2, circular_buf, tail, HAL_MAX_DELAY)) != HAL_OK){
-			  Error_Handler();
-			}
-    		ready = 0;
+    	if ((counter > 0) && (!done)){
+    		counter++;
+    		if (counter == (MIC_SAMPLES_PER_PACKET*12)){
+    			if ((HAL_UART_Transmit(&huart2, circular_buf_full + tail_full, (MIC_SAMPLES_PER_PACKET*16)-tail_full, HAL_MAX_DELAY)) != HAL_OK){
+    				Error_Handler();
+    			}
+    			if ((HAL_UART_Transmit(&huart2, circular_buf_full, tail_full, HAL_MAX_DELAY)) != HAL_OK){
+    				Error_Handler();
+    			}
+    			done = 1;
+    		}
     	}
-        tail = (tail + 1) % (MIC_SAMPLES_PER_PACKET*4);
-        head = (head + 1) % (MIC_SAMPLES_PER_PACKET*4);
+
+    	if ((moving_avg >= MOVING_AVG_THRESHOLD) && (counter == 0)){
+    		counter += 1;
+    		done = 0;
+    	}
+        tail_mov = (tail_mov + 1) % (MIC_SAMPLES_PER_PACKET*4);
+        head_mov = (head_mov + 1) % (MIC_SAMPLES_PER_PACKET*4);
+
+        tail_full = (tail_full + 1) % (MIC_SAMPLES_PER_PACKET*16);
+        head_full = (head_full + 1) % (MIC_SAMPLES_PER_PACKET*16);
 
 
    //     *dest++ = sample;     // left channel has data
