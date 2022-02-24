@@ -30,12 +30,16 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#define CLAP_THRESHOLD 3.0f
+#define CLAP_DURATION 200
 #define MIC_SAMPLE_FREQUENCY 44000
 #define MIC_SAMPLES_PER_MS (MIC_SAMPLE_FREQUENCY/1000)  // == 48
 #define MIC_NUM_CHANNELS 1
 #define MIC_MS_PER_PACKET 20
 #define MIC_SAMPLES_PER_PACKET (MIC_SAMPLES_PER_MS * MIC_MS_PER_PACKET) // == 960
-#define MOVING_AVG_THRESHOLD 1.5f
+#define MOVING_AVG_THRESHOLD CLAP_THRESHOLD
+#define MOVING_AVG_LEN CLAP_DURATION
+#define SEND_LEN 64000
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -59,15 +63,15 @@ DMA_HandleTypeDef hdma_uart4_rx;
 
 /* USER CODE BEGIN PV */
 volatile int32_t *_sampleBuffer[MIC_SAMPLES_PER_PACKET * 2];
-int8_t _processBuffer[MIC_SAMPLES_PER_PACKET];
 int8_t _sendBuffer[MIC_SAMPLES_PER_PACKET];
-int8_t circular_buf_mov[MIC_SAMPLES_PER_PACKET*4];
-uint16_t head_mov;
-uint16_t tail_mov;
-int8_t circular_buf_full[MIC_SAMPLES_PER_PACKET*16];
-uint16_t head_full;
-uint16_t tail_full;
-uint16_t moving_sum;
+int8_t circular_buf_mov[MOVING_AVG_LEN];
+uint32_t head_mov;
+uint32_t tail_mov;
+
+int8_t circular_buf_full[SEND_LEN];
+uint32_t head_full;
+uint32_t tail_full;
+int64_t moving_sum;
 float moving_avg;
 bool _running;
 uint16_t counter;
@@ -88,11 +92,9 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint32_t timerVal;
+int32_t timerVal;
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
-	timerVal = HAL_TIM_ReadCapturedValue(&htim2, TIM_CHANNEL_3);
-	HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70);
 	__HAL_TIM_SET_COUNTER(htim,0);
 }
 /* USER CODE END 0 */
@@ -240,7 +242,7 @@ static void MX_SAI1_Init(void)
   }
   /* USER CODE BEGIN SAI1_Init 2 */
   if ((HAL_SAI_Receive_DMA(&hsai_BlockB1, (uint8_t*) _sampleBuffer, MIC_SAMPLES_PER_PACKET * 2)) == HAL_OK) {
-	  HAL_Delay(5000);
+	  HAL_Delay(1000);
 	  _running = true;
   }
   /* USER CODE END SAI1_Init 2 */
@@ -427,20 +429,33 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
 
   if (_running) {
 
-      int8_t *dest = _processBuffer;
-
       for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
 
         int8_t sample = ((data_in[0]>>16) & 0xff);
+        // int16_t sample_mov = (data_in[0] & 0x0000ffff);
         moving_sum += abs(sample);
         moving_sum -= abs(circular_buf_mov[tail_mov]);
     	circular_buf_mov[tail_mov] = sample;
     	circular_buf_full[tail_full] = sample;
-    	moving_avg = ((float) moving_sum)/(MIC_SAMPLES_PER_PACKET*4);
+    	moving_avg = ((float) moving_sum)/(MOVING_AVG_LEN);
+    //	int64_t tmp = (int64_t) moving_avg;
+    //	uint8_t buffer[50];
+
+    //	sprintf(buffer, "%i\n", tmp);
+    //	HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), 70);
+
     	if ((counter > 0) && (!done)){
     		counter++;
-    		if (counter == (MIC_SAMPLES_PER_PACKET*12)){
-    			if ((HAL_UART_Transmit(&huart2, circular_buf_full + tail_full, (MIC_SAMPLES_PER_PACKET*16)-tail_full, HAL_MAX_DELAY)) != HAL_OK){
+    		if (counter == (SEND_LEN/2)){
+    			timerVal = TIM2->CNT;
+    			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70) != HAL_OK)){
+    				Error_Handler();
+    			}
+    			uint32_t endflag = 0xCDCDCDCD;
+    			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&endflag, 4, 70) != HAL_OK)){
+    			    				Error_Handler();
+    			}
+    			if ((HAL_UART_Transmit(&huart2, circular_buf_full + tail_full, (SEND_LEN)-tail_full, HAL_MAX_DELAY)) != HAL_OK){
     				Error_Handler();
     			}
     			if ((HAL_UART_Transmit(&huart2, circular_buf_full, tail_full, HAL_MAX_DELAY)) != HAL_OK){
@@ -453,29 +468,23 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
     	if ((moving_avg >= MOVING_AVG_THRESHOLD) && (counter == 0)){
     		counter += 1;
     		done = 0;
+			timerVal = TIM2->CNT;
+			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70) != HAL_OK)){
+				Error_Handler();
+			}
+			uint32_t endflag = 0xABABABAB;
+			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&endflag, 4, 70) != HAL_OK)){
+			    				Error_Handler();
+			}
     	}
-        tail_mov = (tail_mov + 1) % (MIC_SAMPLES_PER_PACKET*4);
-        head_mov = (head_mov + 1) % (MIC_SAMPLES_PER_PACKET*4);
+        tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
+        head_mov = (head_mov + 1) % (MOVING_AVG_LEN);
 
-        tail_full = (tail_full + 1) % (MIC_SAMPLES_PER_PACKET*16);
-        head_full = (head_full + 1) % (MIC_SAMPLES_PER_PACKET*16);
+        tail_full = (tail_full + 1) % (SEND_LEN);
+        head_full = (head_full + 1) % (SEND_LEN);
 
-
-   //     *dest++ = sample;     // left channel has data
-   //     *dest++ = sample;     // right channel is duplicated from the left
-          data_in += 2;
+        data_in += 2;
       }
-
-   ///   int8_t *src = _processBuffer;
-   //   dest = data_out;
-//
-   //   for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
-   //     *dest++ = *src;
-   //     src += 2;
-   //   }
-
-
-    // send the adjusted data to the host
 
 
   }
