@@ -34,34 +34,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := helloWorldf446RE
+BUILD_ARTIFACT_NAME := F446RE_LoRa_Transmit
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-helloWorldf446RE.elf \
+F446RE_LoRa_Transmit.elf \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-helloWorldf446RE.list \
+F446RE_LoRa_Transmit.list \
 
 OBJCOPY_BIN += \
-helloWorldf446RE.bin \
+F446RE_LoRa_Transmit.bin \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: helloWorldf446RE.elf secondary-outputs
+main-build: F446RE_LoRa_Transmit.elf secondary-outputs
 
 # Tool invocations
-helloWorldf446RE.elf: $(OBJS) $(USER_OBJS) C:\Users\kevin\STM32CubeIDE\workspace_1.7.0\helloWorldf446RE\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "helloWorldf446RE.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\kevin\STM32CubeIDE\workspace_1.7.0\helloWorldf446RE\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="helloWorldf446RE.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+F446RE_LoRa_Transmit.elf: $(OBJS) $(USER_OBJS) /Users/vk/Documents/ucsb/senior/winter/ece189b/CACI_capstone/lora_spi/lora_transmit/STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "F446RE_LoRa_Transmit.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/vk/Documents/ucsb/senior/winter/ece189b/CACI_capstone/lora_spi/lora_transmit/STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F446RE_LoRa_Transmit.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -70,19 +70,19 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-helloWorldf446RE.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "helloWorldf446RE.list"
+F446RE_LoRa_Transmit.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "F446RE_LoRa_Transmit.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-helloWorldf446RE.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "helloWorldf446RE.bin"
+F446RE_LoRa_Transmit.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "F446RE_LoRa_Transmit.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) default.size.stdout helloWorldf446RE.bin helloWorldf446RE.elf helloWorldf446RE.list
+	-$(RM) F446RE_LoRa_Transmit.bin F446RE_LoRa_Transmit.elf F446RE_LoRa_Transmit.list default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)

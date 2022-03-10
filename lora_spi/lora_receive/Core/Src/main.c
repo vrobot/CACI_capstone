@@ -59,10 +59,8 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 uint8_t data[] = "HELLO WORLD\n\r";
-uint8_t initFailed[] = "Init FAILED \n\r";
-uint8_t initSuccess[] = "Init SUCCESS \n\r";
-uint8_t transceiveFailed[] = "Transceive FAILED \n\r";
-uint8_t transceiveSuccess[] = "Transceive SUCCESS \n\r";
+uint8_t failed[] = "Interfacing FAILED \n\r";
+uint8_t success[] = "Interfacing SUCCESS \n\r";
 /* USER CODE END 0 */
 
 /**
@@ -101,36 +99,36 @@ int main(void)
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
   lora_sx1276 lora;
-//  uint8_t version =  lora_version(&lora);
+  uint8_t version =  lora_version(&lora);
 
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
     if (res != LORA_OK) {
       // Initialization failed
-    	HAL_UART_Transmit(&huart2, initFailed, sizeof(initFailed), 1000);
-    	HAL_UART_Transmit(&huart2, (uint8_t *)res, sizeof((uint8_t *)res), 1000);
+    	HAL_UART_Transmit(&huart2, res, sizeof(res), 1000);
     }
     else{
-    	HAL_UART_Transmit(&huart2, initSuccess, sizeof(initSuccess), 1000);
+    	HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
     }
 
     // Receive buffer
-	uint8_t buffer[32];
-	// Put LoRa modem into continuous receive mode
-	lora_mode_receive_continuous(&lora);
-	// Wait for packet up to 10sec
-//	uint8_t res;
-	uint8_t len = lora_receive_packet_blocking(&lora, buffer, sizeof(buffer), 10000, &res);
-	if (res != LORA_OK) {
-	// Receive failed
-		HAL_UART_Transmit(&huart2, transceiveFailed, sizeof(transceiveFailed), 1000);
-	}
-	else{
-		HAL_UART_Transmit(&huart2, transceiveSuccess, sizeof(transceiveSuccess), 1000);
-	}
-	buffer[len] = 0;  // null terminate string to print it
+    uint8_t buffer[255];
+    // Put LoRa modem into continuous receive mode
+    lora_mode_receive_continuous(&lora);
+    // Wait for packet up to 10sec
 
-	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
-//      printf("'%s'\n", buffer);
+    for(uint8_t i = 0; i < 4; i++){
+		uint8_t len = lora_receive_packet_blocking(&lora, buffer, sizeof(buffer), 4000, &res);
+		if (res != LORA_OK) {
+			HAL_UART_Transmit(&huart2, (uint8_t *) "failed\n", strlen("failed\n"), 1000);
+		}else{
+			HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
+		}
+    }
+   // buffer[len] = 0;  // null terminate string to print it
+
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */

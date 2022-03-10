@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -45,6 +47,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 //GPIO_HandleTypeDef pb0_nss;
+static uint8_t send_data[1024];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -70,6 +73,7 @@ uint8_t success[] = "Interfacing SUCCESS \n\r";
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	//send_data = (uint8_t *) malloc(sizeof(uint8_t)*1024);
 
   /* USER CODE END 1 */
 
@@ -95,6 +99,10 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+//  for(uint16_t i = 0; i < 1024; i++){
+//	  send_data[i] = i%256;
+// }
+
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
@@ -104,19 +112,36 @@ int main(void)
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
     if (res != LORA_OK) {
       // Initialization failed
-//    	HAL_UART_Transmit(&huart2, failed, sizeof(failed), 1000);
     	HAL_UART_Transmit(&huart2, res, sizeof(res), 1000);
     }
     else{
     	HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
     }
+//
+    uint8_t test_data[255];
+    for(uint8_t n = 0; n < 255; n++){
+    	test_data[n] = n%255;
+    }
 
-    uint8_t packet_test = lora_send_packet(&lora, (uint8_t *)"test", 4);
-      if (packet_test != LORA_OK) {
-    	  HAL_UART_Transmit(&huart2, failed, sizeof(failed), 1000);
-      } else {
-    	  HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
-      }
+    uint8_t loop = 0;
+    uint8_t packet_test;
+//    for(uint8_t i = 0; i < 4; i++){
+    while (loop < 4) {
+    	 packet_test = lora_send_packet(&lora, test_data, 255);
+		 if (packet_test != LORA_OK) {
+			  HAL_UART_Transmit(&huart2, failed, sizeof(failed), 1000);
+		  } else {
+			  HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+		  }
+		 HAL_Delay(1000);
+		 loop = loop + 1;
+
+    }
+
+
+
+//    }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */

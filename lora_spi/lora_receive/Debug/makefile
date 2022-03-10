@@ -60,8 +60,8 @@ all: main-build
 main-build: F446RE_LoRa_Receive.elf secondary-outputs
 
 # Tool invocations
-F446RE_LoRa_Receive.elf: $(OBJS) $(USER_OBJS) C:\Users\kevin\STM32CubeIDE\workspace_1.7.0\F446RE_LoRa_Receive\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "F446RE_LoRa_Receive.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\kevin\STM32CubeIDE\workspace_1.7.0\F446RE_LoRa_Receive\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F446RE_LoRa_Receive.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+F446RE_LoRa_Receive.elf: $(OBJS) $(USER_OBJS) /Users/vk/Documents/ucsb/senior/winter/ece189b/CACI_capstone/lora_spi/lora_receive/STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "F446RE_LoRa_Receive.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/vk/Documents/ucsb/senior/winter/ece189b/CACI_capstone/lora_spi/lora_receive/STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F446RE_LoRa_Receive.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
