@@ -99,7 +99,7 @@ int main(void)
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
   lora_sx1276 lora;
-  uint8_t version =  lora_version(&lora);
+//  uint8_t version =  lora_version(&lora); //this line hard faults
 
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
     if (res != LORA_OK) {
