@@ -40,7 +40,17 @@
 #define MIC_SAMPLES_PER_PACKET (MIC_SAMPLES_PER_MS * MIC_MS_PER_PACKET) // == 960
 #define MOVING_AVG_THRESHOLD CLAP_THRESHOLD
 #define MOVING_AVG_LEN CLAP_DURATION
-#define SEND_LEN 64000
+#define SEND_LEN 2550
+#define NODE 1
+
+#if (NODE == 1)
+#define NODE_DELAY 0
+#elif (NODE == 2)
+#define NODE_DELAY 100000000
+#elif (NODE == 3)
+#define NODE_DELAY 200000000
+#endif
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -79,9 +89,11 @@ float moving_avg;
 bool _running;
 uint16_t counter;
 int done;
-uint8_t data[] = "HELLO WORLD\n\r";
-uint8_t failed[] = "Interfacing FAILED \n\r";
-uint8_t success[] = "Interfacing SUCCESS \n\r";
+uint32_t devID = NODE;
+uint32_t endPadding = 0xABABABAB;
+lora_sx1276 lora;
+uint8_t failed[] = "Interfacing FAILED";
+uint8_t success[] = "Interfacing SUCCESS";
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -164,15 +176,11 @@ int main(void)
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
-  lora_sx1276 lora;
 
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
   HAL_Delay(100);
   if (res != LORA_OK) {
-	  HAL_UART_Transmit(&huart2, &res, sizeof(res), 1000);
-  }
-  else{
-	  HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+	  HAL_UART_Transmit(&huart2, failed, sizeof(failed), 1000);
   }
 
   /* USER CODE END 2 */
@@ -497,22 +505,18 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
       for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
 
         int8_t sample = ((data_in[0]>>16) & 0xff);
-        // int16_t sample_mov = (data_in[0] & 0x0000ffff);
         moving_sum += abs(sample);
         moving_sum -= abs(circular_buf_mov[tail_mov]);
     	circular_buf_mov[tail_mov] = sample;
     	circular_buf_full[tail_full] = sample;
     	moving_avg = ((float) moving_sum)/(MOVING_AVG_LEN);
-    //	int64_t tmp = (int64_t) moving_avg;
-    //	uint8_t buffer[50];
 
-    //	sprintf(buffer, "%i\n", tmp);
-    //	HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), 70);
 
     	if ((counter > 0) && (!done)){
     		counter++;
-    		if (counter == (SEND_LEN/2)){
-    			timerVal = TIM2->CNT;
+    		if (counter == (SEND_LEN-100)){
+    			// timerVal = TIM2->CNT;
+    			/*
     			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70) != HAL_OK)){
     				Error_Handler();
     			}
@@ -526,6 +530,42 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
     			if ((HAL_UART_Transmit(&huart2, circular_buf_full, tail_full, HAL_MAX_DELAY)) != HAL_OK){
     				Error_Handler();
     			}
+    			*/
+
+    			for(int delay = 0; delay < NODE_DELAY; delay++);
+
+    			uint8_t metaData[255];
+    			memset(metaData, 0, sizeof(metaData));
+    			memcpy(metaData, &timerVal, 4);
+    			memcpy(metaData+4, &devID, 4);
+    			memcpy(metaData+8, &endPadding, 4);
+
+    			uint8_t packet_res = lora_send_packet(&lora, metaData, 255);
+
+    			if (packet_res != LORA_OK) {
+    				HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
+    			}
+    			else {
+    				HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+    			}
+
+    			for(int delay = 0; delay < 5000000; delay++); // non-blocking delay
+
+    			uint8_t sendBuf[SEND_LEN];
+    			memcpy(sendBuf, circular_buf_full+tail_full, (SEND_LEN)-tail_full);
+    			memcpy(sendBuf+(SEND_LEN)-tail_full, circular_buf_full, tail_full);
+
+    			for(int send_loop_cnt = 0; send_loop_cnt < 10; send_loop_cnt++){
+    				packet_res = lora_send_packet(&lora, sendBuf+(255*send_loop_cnt), 255);
+    				if (packet_res != LORA_OK) {
+    					HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
+    				}
+    				else {
+    					HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+    				}
+    				for(int delay = 0; delay < 5000000; delay++); // non-blocking delay
+    			}
+
     			done = 1;
     		}
     	}
@@ -534,6 +574,7 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
     		counter += 1;
     		done = 0;
 			timerVal = TIM2->CNT;
+			/*
 			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&timerVal, 4, 70) != HAL_OK)){
 				Error_Handler();
 			}
@@ -541,6 +582,7 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
 			if ((HAL_UART_Transmit(&huart2, (uint8_t*)&endflag, 4, 70) != HAL_OK)){
 			    				Error_Handler();
 			}
+			*/
     	}
         tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
         head_mov = (head_mov + 1) % (MOVING_AVG_LEN);
