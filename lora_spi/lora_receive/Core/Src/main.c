@@ -44,7 +44,6 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-//GPIO_HandleTypeDef pb0_nss;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,9 +57,8 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t data[] = "HELLO WORLD\n\r";
-uint8_t failed[] = "Interfacing FAILED \n\r";
-uint8_t success[] = "Interfacing SUCCESS \n\r";
+uint8_t iterfacing_success[] = "Interfacing SUCCESS";
+uint8_t iterfacing_failed[] = "Interfacing FAILED";
 /* USER CODE END 0 */
 
 /**
@@ -99,35 +97,24 @@ int main(void)
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
   lora_sx1276 lora;
-//  uint8_t version =  lora_version(&lora); //this line hard faults
 
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
     if (res != LORA_OK) {
-      // Initialization failed
-    	HAL_UART_Transmit(&huart2, res, sizeof(res), 1000);
-    }
-    else{
-    	HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+    	HAL_UART_Transmit(&huart2, iterfacing_failed, sizeof(iterfacing_failed), 1000);
     }
 
     // Receive buffer
     uint8_t buffer[255];
     // Put LoRa modem into continuous receive mode
     lora_mode_receive_continuous(&lora);
-    // Wait for packet up to 10sec
+    // Wait for packet up to 4 sec
 
-    for(uint8_t i = 0; i < 4; i++){
+    while(1){
 		uint8_t len = lora_receive_packet_blocking(&lora, buffer, sizeof(buffer), 4000, &res);
-		if (res != LORA_OK) {
-			HAL_UART_Transmit(&huart2, (uint8_t *) "failed\n", strlen("failed\n"), 1000);
-		}else{
-			HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), 1000);
+		if (res == LORA_OK) {
+			HAL_UART_Transmit(&huart2, buffer, len, 1000);
 		}
     }
-   // buffer[len] = 0;  // null terminate string to print it
-
-
-
 
   /* USER CODE END 2 */
 

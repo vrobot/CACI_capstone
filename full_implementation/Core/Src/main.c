@@ -92,8 +92,11 @@ int done;
 uint32_t devID = NODE;
 uint32_t endPadding = 0xABABABAB;
 lora_sx1276 lora;
-uint8_t failed[] = "Interfacing FAILED";
-uint8_t success[] = "Interfacing SUCCESS";
+uint8_t iterfacing_success[] = "Interfacing SUCCESS";
+uint8_t iterfacing_failed[] = "Interfacing FAILED";
+uint8_t transmission_success[] = "Transmission SUCCESS";
+uint8_t transmission_failed[] = "Transmission FAILED";
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -180,7 +183,7 @@ int main(void)
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
   HAL_Delay(100);
   if (res != LORA_OK) {
-	  HAL_UART_Transmit(&huart2, failed, sizeof(failed), 1000);
+	  HAL_UART_Transmit(&huart2, iterfacing_failed, sizeof(iterfacing_failed), 1000);
   }
 
   /* USER CODE END 2 */
@@ -532,21 +535,20 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
     			}
     			*/
 
-    			for(int delay = 0; delay < NODE_DELAY; delay++);
+    			for(int delay = 0; delay < NODE_DELAY; delay++); // non-blocking delay used to offset the transmissions of each node to prevent garbled transmissions
 
-    			uint8_t metaData[255];
-    			memset(metaData, 0, sizeof(metaData));
+    			uint8_t metaData[12];
     			memcpy(metaData, &timerVal, 4);
     			memcpy(metaData+4, &devID, 4);
     			memcpy(metaData+8, &endPadding, 4);
 
-    			uint8_t packet_res = lora_send_packet(&lora, metaData, 255);
+    			uint8_t packet_res = lora_send_packet(&lora, metaData, 12);
 
     			if (packet_res != LORA_OK) {
     				HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
     			}
     			else {
-    				HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+    				HAL_UART_Transmit(&huart2, transmission_success, sizeof(transmission_success), 1000);
     			}
 
     			for(int delay = 0; delay < 5000000; delay++); // non-blocking delay
@@ -561,7 +563,7 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
     					HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
     				}
     				else {
-    					HAL_UART_Transmit(&huart2, success, sizeof(success), 1000);
+    					HAL_UART_Transmit(&huart2, transmission_success, sizeof(transmission_success), 1000);
     				}
     				for(int delay = 0; delay < 5000000; delay++); // non-blocking delay
     			}
