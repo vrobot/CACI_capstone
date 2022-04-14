@@ -139,6 +139,9 @@ def MLZ(nodes, times, v):
 
 	return result_numeric #, result_symbolic  <-------------------------- uncomment for symbolic solutions
 
+# returns predictions about the source of the sonic event with error specified 
+# nodes is formatted as follows: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
+# times is formatted as follows: [t1, t2, t3 ... tn]
 def noisy_MLZ(nodes, times, v, error_scale):
 	#convert the scale of an error to its absolute value
 	error_abs = error_scale * find_farthest_points(nodes)
@@ -173,18 +176,37 @@ def find_farthest_points(points):
 	
 	return max(distances)
 
+# returns predictions about the source of the sonic event  
+# nodes is formatted as follows: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
+# times is formatted as follows: [t1, t2, t3 ... tn]
 def LST(nodes, times, v):
 
+	#print(nodes)
+	#print(times)
+
+	#print(np.array(nodes))
+	#print(np.array([times]).T)
+
+	nodes = np.concatenate((np.array(nodes), np.array([times]).T), axis=1).tolist()
+	#nodes = zip(nodes,times)
+	print(nodes)
 	def equations(guess):
 			x, y, r = guess
 
 			output = []
-
-			for i, n in enumerate(nodes):
-				x1 = n[0]
-				y1 = n[1]
-				dist1 = v * times[i]
-				output.append((x - x1)**2 + (y - y1)**2 - (dist1 - r)**2)
+			
+			#print(nodes)
+			for combo in combinations(nodes, 2):
+				#print('COMBO: ', combo)
+				n1 = combo[0]
+				n2 = combo[1]
+				x1 = n1[0]
+				y1 = n1[1]
+				x2 = n2[0]
+				y2 = n2[1]
+				tdoa = n1[2] - n2[2]
+				ddoa = v * tdoa
+				output.append((math.sqrt((x - x1)**2 + (y - y1)**2) - math.sqrt((x - x2)**2 + (y - y2)**2)) - (ddoa - r))
 
 			return tuple(output)
 
@@ -198,20 +220,50 @@ def LST(nodes, times, v):
 
 	return [final_guess.x[0], final_guess.x[1]]
 
+#convert list of distances to a triangle matrix of their tdoas
+#
+
+def dist2tdoa(dist_list):
+	tdoa_list = 0*[len(dist_list)][len(dist_list)]
+
+	for i, d1 in enumerate(dist_list):
+		for j, d2 in enumerate(dist_list[i+1:]):
+			tdoa_list[i][j] = d1 - d2
+
+	return tdoa_list
+
 def noisy_LST(nodes, times, v, error_scale):
 	#convert the scale of an error to its absolute value
-	error_abs = error_scale * find_farthest_points(nodes)
+	error_abs = error_scale * find_farthest_points(nodes) / v
+	
+
+	# create a normal distribution based on the error scale and apply it to each node's timestamp
+	for i, t in enumerate(times):
+		#print('before: ', times[i])
+		times[i] = t + np.random.normal(0, error_abs)
+		#print('after:  ', times[i])
+
+	output = LST(nodes, times, v)
+	return output
+
+
+def variable_noisy_LST(nodes, times, v, error_scale):
+	#convert the scale of an error to its absolute value
+	ffp = find_farthest_points(nodes) / v
 
 	# create a normal distribution based on the error scale and apply it to each node's timestamp
 	for i, t in enumerate(times):
 		print('before: ', times[i])
+		error_abs = error_scale[i] * ffp
 		times[i] = t + np.random.normal(0, error_abs)
 		print('after:  ', times[i])
 
 	output = LST(nodes, times, v)
 	return output
 
-def test_LST(iterations, nodes, display, error_scale):
+
+#nodes is formatted as follows: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
+def test_LST(iterations, nodes, display, error_scale, acceptable_error):
 	
 	# speed of sound
 	s_o_s = 1
@@ -229,7 +281,7 @@ def test_LST(iterations, nodes, display, error_scale):
 	s_y = np.random.normal(mean_y, std_y, iterations)
 
 	# find the farthest nodes from each other and their distance
-	checker_err = find_farthest_points(nodes) * error_scale * 2
+	checker_err = find_farthest_points(nodes) * acceptable_error
 
 	output = []
 	incorrect_guesses = 0
@@ -283,30 +335,105 @@ def test_LST(iterations, nodes, display, error_scale):
 		
 		#show the whole plot
 	if(display == True):
+		plt.xlim([-10, 10])
+		plt.ylim([-10, 10])
 		plt.show()
 
 	# return proportion of correct guesses
 	return (iterations - incorrect_guesses) / iterations
 
-# change variables here
-speed_of_sound = 1
 
-# edit the locations of each microphone
-# format: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
-node_list = [[0, 1], [8, -3], [-1, 5], [3, 7], [-3, -4]]
+def test1():
+	# change variables here
+	speed_of_sound = 1
 
-# set number of points to check
-iterations = 100
+	# edit the locations of each microphone
+	# format: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
+	node_list = [[0, 1], [6, -3], [-6, 5], [3, 7], [-3, -5]]
 
-# set whether or not a graph of outputs is shown
-display_results = True
+	# set number of points to check
+	iterations = 10
 
-# set the size of noise error with regard to maximum distance between nodes
-error_scale = 0.01
+	# set whether or not a graph of outputs is shown
+	display_results = True
 
-#display the accuracy of the test
-accuracy = test_LST(iterations, node_list, display_results, error_scale)
+	# set the size of noise error with regard to maximum distance between nodes
+	error_scale = 0.015
 
-print("Accuracy: ", (accuracy*100), '%')
+	acceptable_error = 0.02
 
-print('done!')
+	#display the accuracy of the test
+	accuracy = test_LST(iterations, node_list, display_results, error_scale, acceptable_error)
+
+	print("Accuracy: ", (accuracy*100), '%')
+
+	print('done!')
+
+def test2():
+	# change variables here
+	speed_of_sound = 343
+
+	# true source of sound
+	true_sound_list = [[0, 0], [15, 0], [7.5, 0], [0, 0], [10, 0]]
+	tdoa_list = []
+
+
+	# edit the locations of each microphone
+	# format: [[x1, y1], [x2, y2], [x3, y3] ... [xn, yn]]
+	#fake_node = [5, 8]
+	fake_node = [0, 15]
+	node_list_list = [
+		[[0, 0], [15, 0], fake_node], 
+		[[0, 0], [15, 0], fake_node], 
+		[[0, 0], [15, 0], fake_node], 
+		[[0, 0], [20, 0], fake_node], 
+		[[0, 0], [10, 0], fake_node]
+	]
+
+	#spoof a node
+	fake_node_true_time = []
+	for t in true_sound_list:
+		d = math.sqrt((t[0] - fake_node[0])**2 + (t[1] - fake_node[1])**2)
+		fake_time = d/speed_of_sound
+		fake_node_true_time.append(fake_time)
+
+	print(fake_node_true_time[0])
+	# time of arrival list
+	# format: [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3], ]
+	
+	toa_list = [
+		[0, 0.05230, fake_node_true_time[0]],
+		[0.04177, 0, fake_node_true_time[1]],
+		[0, 0.00030, fake_node_true_time[2]],
+		[0, 0.06565, fake_node_true_time[3]],
+		[0.02614, 0, fake_node_true_time[4]]
+	]
+
+	# set number of points to check
+	iterations = 100
+
+	# set whether or not a graph of outputs is shown
+	display_results = True
+
+	# set the size of noise error with regard to maximum distance between nodes
+	error_scale_list = [0, 0, 0.00]
+
+
+
+	for i, node_list in enumerate(node_list_list):
+		pred = variable_noisy_LST(node_list, toa_list[i], speed_of_sound, error_scale_list)
+		
+		plt.scatter(node_list[0][0], node_list[0][1], color = 'black', marker='$A$')
+		plt.scatter(node_list[1][0], node_list[1][1], color = 'black', marker='$B$')
+		plt.scatter(node_list[2][0], node_list[2][1], color = 'black', marker='$C$')
+
+		plt.scatter(true_sound_list[i][0], true_sound_list[i][1], color = 'red', marker='o')
+		plt.scatter(pred[0], pred[1], color = 'green', marker='x')
+		plt.show()
+		print('prediction of sample ', (i + 1), ': ', pred)
+
+
+
+# run tests
+
+test1()
