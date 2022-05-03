@@ -26,12 +26,15 @@
 #include <stdbool.h>
 #include "string.h"
 #include "lora_sx1276.h"
+#include "string.h"
+#include "arm_math.h"
+#include "fir_coeffs1400-2600hz.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define CLAP_THRESHOLD 3.0f
-#define CLAP_DURATION 200
+#define CLAP_THRESHOLD 100.0f
+#define CLAP_DURATION 5
 #define MIC_SAMPLE_FREQUENCY 44000
 #define MIC_SAMPLES_PER_MS (MIC_SAMPLE_FREQUENCY/1000)  // == 48
 #define MIC_NUM_CHANNELS 1
@@ -39,7 +42,8 @@
 #define MIC_SAMPLES_PER_PACKET (MIC_SAMPLES_PER_MS * MIC_MS_PER_PACKET) // == 960
 #define MOVING_AVG_THRESHOLD CLAP_THRESHOLD
 #define MOVING_AVG_LEN CLAP_DURATION
-#define SEND_LEN 2550
+#define NUM_SEND_PACKETS 100
+#define SEND_LEN (255 * NUM_SEND_PACKETS)
 #define NODE 1
 
 #if (NODE == 1)
@@ -49,6 +53,9 @@
 #elif (NODE == 3)
 #define NODE_DELAY 200000000
 #endif
+
+#define BLOCK_SIZE MIC_SAMPLES_PER_PACKET / 2
+#define FILTER_LEN 101
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -70,31 +77,54 @@ TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 volatile int32_t *_sampleBuffer[MIC_SAMPLES_PER_PACKET * 2];
-int8_t _sendBuffer[MIC_SAMPLES_PER_PACKET];
-int8_t circular_buf_mov[MOVING_AVG_LEN];
+int16_t circular_buf_mov[MOVING_AVG_LEN];
+int16_t circular_buf_mov_right[MOVING_AVG_LEN];
 uint32_t head_mov;
 uint32_t tail_mov;
 
-int8_t circular_buf_full[SEND_LEN];
+int16_t circular_buf_full[SEND_LEN];
 uint32_t head_full;
 uint32_t tail_full;
-int64_t moving_sum;
+float moving_sum;
 float moving_avg;
+int64_t moving_sum_left;
+float moving_avg_left;
+int64_t moving_sum_right;
+float moving_avg_right;
 bool _running;
 uint16_t counter;
 int done;
 uint32_t devID = NODE;
-uint32_t endPadding = 0xABABABAB;
+uint32_t startPadding = 0xABABABAB;
+uint32_t endMetaPadding = 0xCDCDCDCD;
 lora_sx1276 lora;
 uint8_t iterfacing_success[] = "Interfacing SUCCESS";
 uint8_t iterfacing_failed[] = "Interfacing FAILED";
 uint8_t transmission_success[] = "Transmission SUCCESS";
 uint8_t transmission_failed[] = "Transmission FAILED";
-uint8_t GPS_buffer[40];
+
+uint8_t GPS_buffer[1024];
+
+
+char buffStr[1024];
+char nmeaSnt[80];
+/*
+char lat[12];
+char lon[13];
+char tim[6];
+*/
+uint8_t GPS_tmp;
+uint8_t GPS_latest_data[65];
+int send = 0;
+
+arm_fir_instance_f32 S;
+float buffer[FILTER_LEN + BLOCK_SIZE - 1];
+uint32_t blockSize = BLOCK_SIZE;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -107,7 +137,7 @@ static void MX_SAI1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void sendData(volatile int32_t *data_in, int8_t *data_out);
+void sendData(volatile int32_t *data_in);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -120,8 +150,55 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    HAL_UART_Transmit(&huart1, GPS_buffer, 1, 100);
-    HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1);
+	//HAL_UART_Transmit(&huart1, GPS_buffer, 255, 10);
+	// GPS_circular_buffer[head_gps] = GPS_tmp;
+	// head_gps = (head_gps + 1) % 128;
+	// memcpy(GPS_buffer, GPS_circular_buffer+head_gps, (128)-head_gps);
+	// memcpy(GPS_buffer+(128)-head_gps, GPS_circular_buffer, head_gps);
+	// uint8_t rmc_message[6];
+	// memcpy(rmc_message, GPS_buffer, 6);
+	// HAL_UART_Transmit(&huart1, &GPS_tmp, 1, 100);
+	// if(strcmp(rmc_message, "$RMC") == 0){
+		// char *chEnd = strchr(GPS_buffer+2, '$') < strchr(GPS_buffer+2, 'G') ? strchr(GPS_buffer+2, '$') : strchr(GPS_buffer+2, 'G');
+		// idxEnd = (int)(chEnd - (char *) GPS_buffer);
+		// memcpy(GPS_transmit_buf, GPS_buffer, idxEnd);
+		//HAL_UART_Transmit(&huart1, GPS_transmit_buf, idxEnd, 100);
+	// }
+
+   //HAL_UART_Receive_DMA(&huart2, &GPS_tmp, 1);
+if (huart == &huart2){
+	//send++;
+	//if (send == 10){
+		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_4);
+	//HAL_UART_Transmit(&huart1, GPS_buffer, 255, 10);
+	//send = 0;
+	//}
+	  char *string;
+			memset(buffStr, 0, 1024);
+			sprintf(buffStr, "%s", GPS_buffer);
+			string = strdup(buffStr);
+			//data = strstr(string, "$GNGLL");
+			//HAL_UART_Transmit(&huart2, (uint8_t*)data, 50, 70);
+
+			char* token;
+			while ((token = strsep(&string, "\n")) != NULL) {
+				memset(nmeaSnt, 0, 80);
+				sprintf(nmeaSnt, "%s\n\r", token);
+				if (((strstr(nmeaSnt, "$GPRMC") != 0) || (strstr(nmeaSnt, "$GPGLL") != 0) || (strstr(nmeaSnt, "$GPGGA") != 0)) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
+					//Raw Data
+					memset(GPS_latest_data, 0, 65);
+					memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
+					HAL_UART_Transmit(&huart1, (uint8_t*)nmeaSnt, strlen(nmeaSnt), 70);
+
+
+				}
+
+			}
+		//	HAL_Delay(20);
+			HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1024);
+
+//	HAL_UART_Receive_DMA(&huart2, GPS_buffer, 255);
+}
 }
 /* USER CODE END 0 */
 
@@ -139,17 +216,20 @@ int main(void)
   tail_full = 1;
   moving_sum = 0;
   moving_avg = 0;
+  moving_sum_left = 0;
+  moving_avg_left = 0;
+  moving_sum_right = 0;
+  moving_avg_right = 0;
   counter = 0;
   done = 0;
-  for(int i = 0; i < (MIC_SAMPLES_PER_PACKET*4); i++){
-	  circular_buf_mov[i] = 0;
-  }
-  for(int i = 0; i < (MIC_SAMPLES_PER_PACKET*16); i++){
-	  circular_buf_full[i] = 0;
-  }
-  for(int i = 0; i < (MIC_SAMPLES_PER_PACKET * 2); i++){
-	  _sampleBuffer[i] = 0;
-  }
+  memset(circular_buf_mov, 0, MOVING_AVG_LEN*sizeof(int16_t));
+  memset(circular_buf_mov_right, 0, MOVING_AVG_LEN*sizeof(int16_t));
+  memset(circular_buf_full, 0, SEND_LEN*sizeof(int16_t));
+  memset(_sampleBuffer, 0, MIC_SAMPLES_PER_PACKET*2*sizeof(int32_t));
+  arm_fir_init_f32(&S, FILTER_LEN, coeffs, buffer, blockSize);
+
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -178,26 +258,30 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3);
-  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_SET);
+
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_5, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
-  HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1);
+  HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1024);
 
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
-    if (res != LORA_OK) {
-    	HAL_UART_Transmit(&huart1, iterfacing_failed, sizeof(iterfacing_failed), 1000);
-    }
+  if (res != LORA_OK) {
+	  // HAL_UART_Transmit(&huart1, iterfacing_failed, sizeof(iterfacing_failed), 1000);
+  }
 
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   while (1)
   {
+
 
     /* USER CODE END WHILE */
 
@@ -459,6 +543,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream4_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -481,7 +568,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3|GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(NSS_GPIO_Port, NSS_Pin, GPIO_PIN_RESET);
@@ -492,8 +579,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_5, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PF3 PF5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_5;
+  /*Configure GPIO pins : PF3 PF4 PF5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -524,72 +611,103 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_SAI_RxHalfCpltCallback(SAI_HandleTypeDef *hsai) {
-	sendData(_sampleBuffer, _sendBuffer);
+	sendData(_sampleBuffer);
 }
 
 void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef *hsai) {
-	sendData(&_sampleBuffer[MIC_SAMPLES_PER_PACKET], &_sendBuffer[MIC_SAMPLES_PER_PACKET / 2]);
+	sendData(&_sampleBuffer[MIC_SAMPLES_PER_PACKET]);
 }
 
-void sendData(volatile int32_t *data_in, int8_t *data_out) {
+void sendData(volatile int32_t *data_in) {
+
+	float data_in_float[MIC_SAMPLES_PER_PACKET / 2];
+	float filt[MIC_SAMPLES_PER_PACKET / 2];
+	volatile int32_t *data_in_tmp = data_in;
+	for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
+		int16_t tmp = (int16_t) ((data_in_tmp[0]>>8) & 0xffff);
+		data_in_float[i] = (float) tmp;
+		data_in_tmp += 2;
+	}
+	arm_fir_f32(&S, data_in_float, filt, blockSize);
+
 
   if (_running) {
-
       for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
 
-        int8_t sample = ((data_in[0]>>16) & 0xff);
-        moving_sum += abs(sample);
-        moving_sum -= abs(circular_buf_mov[tail_mov]);
-    	circular_buf_mov[tail_mov] = sample;
-    	circular_buf_full[tail_full] = sample;
-    	moving_avg = ((float) moving_sum)/(MOVING_AVG_LEN);
+        int16_t sample_left = (int16_t) ((data_in[0]>>8) & 0xffff);
+        // int16_t sample_right = (int16_t) ((data_in[1]>>8) & 0xffff);
+        float   sample_inf = (float) sample_left;
+       // float filt;
+      //  arm_fir_f32(&S, &sample_inf, &filt, blockSize);
+
+
+        moving_sum += (int16_t) fabsf(filt[i]); // * abs(sample_right);
+        moving_sum -= (int16_t) abs(circular_buf_mov[tail_mov]); // * abs(circular_buf_mov_right[tail_mov]);
+        // moving_sum_left += abs(sample_left);
+        // moving_sum_left -= abs(circular_buf_mov_left[tail_mov]);
+        // moving_sum_right += abs(sample_right);
+        // moving_sum_right -= abs(circular_buf_mov_right[tail_mov]);
+    	circular_buf_mov[tail_mov] = (int16_t) filt[i];
+    	// circular_buf_mov_right[tail_mov] = sample_right;
+    	circular_buf_full[tail_full] = (int16_t) filt[i]; // + (float) sample_right)/2);
+        moving_avg = moving_sum / MOVING_AVG_LEN;
+    	// moving_avg_left = ((float) moving_sum_left)/(MOVING_AVG_LEN);
+    	// moving_avg_right = ((float) moving_sum_right)/(MOVING_AVG_LEN);
 
 
     	if ((counter > 0) && (!done)){
     		counter++;
-    		if (counter == (SEND_LEN-100)){
+    		if (counter == (SEND_LEN/2)){ // TODO: need to change this to SEND_LEN-100;
 
     			for(int delay = 0; delay < NODE_DELAY; delay++); // non-blocking delay used to offset the transmissions of each node to prevent garbled transmissions
 
     			uint8_t metaData[12];
-    			memcpy(metaData, &timerVal, 4);
-    			memcpy(metaData+4, &devID, 4);
-    			memcpy(metaData+8, &endPadding, 4);
-
+    			memcpy(metaData, &startPadding, 4);
+    			memcpy(metaData+4, &timerVal, 4);
+    			memcpy(metaData+8, &devID, 4);
+    			// memcpy(metaData+12, GPS_transmit_buf, idxEnd);
+    			// memcpy(metaData+12+idxEnd, &endMetaPadding, 4);
+/*
     			uint8_t packet_res = lora_send_packet(&lora, metaData, 12);
 
     			if (packet_res != LORA_OK) {
-    				HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
+    				HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
     			}
     			else {
-    				HAL_UART_Transmit(&huart2, transmission_success, sizeof(transmission_success), 1000);
+    				HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
     			}
 
     			while(lora_is_transmitting(&lora)); // non-blocking delay
+*/
+    			uint8_t sendBuf[SEND_LEN*2];
+    			memcpy(sendBuf, &circular_buf_full[tail_full], ((SEND_LEN)-tail_full)*2);
+    			memcpy(&sendBuf[(SEND_LEN-tail_full)*2], circular_buf_full, tail_full*2);
+    		    HAL_UART_Transmit(&huart1, (uint8_t*) sendBuf, SEND_LEN*2, 1000);
 
-    			uint8_t sendBuf[SEND_LEN];
-    			memcpy(sendBuf, circular_buf_full+tail_full, (SEND_LEN)-tail_full);
-    			memcpy(sendBuf+(SEND_LEN)-tail_full, circular_buf_full, tail_full);
-
-    			for(int send_loop_cnt = 0; send_loop_cnt < 10; send_loop_cnt++){
+/*
+    			for(int send_loop_cnt = 0; send_loop_cnt < (SEND_LEN/255 + (SEND_LEN % 255 != 0)); send_loop_cnt++){
     				packet_res = lora_send_packet(&lora, sendBuf+(255*send_loop_cnt), 255);
     				if (packet_res != LORA_OK) {
-    					HAL_UART_Transmit(&huart2, &packet_res, sizeof(packet_res), 1000);
+    					HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
     				}
     				else {
-    					HAL_UART_Transmit(&huart2, transmission_success, sizeof(transmission_success), 1000);
+    					HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
     				}
+    	    		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_3);
     				while(lora_is_transmitting(&lora)); // non-blocking delay
     			}
+*/
 
+        		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
     			done = 1;
     		}
     	}
 
     	if ((moving_avg >= MOVING_AVG_THRESHOLD) && (counter == 0)){
+    		timerVal = TIM2->CNT;
+    		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
     		counter += 1;
     		done = 0;
-			timerVal = TIM2->CNT;
 
     	}
         tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
@@ -604,6 +722,7 @@ void sendData(volatile int32_t *data_in, int8_t *data_out) {
 
   }
 }
+
 /* USER CODE END 4 */
 
 /**

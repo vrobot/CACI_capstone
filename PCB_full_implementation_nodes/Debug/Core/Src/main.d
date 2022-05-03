@@ -30,7 +30,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/lora_sx1276.h ../Core/Inc/main.h
+ ../Core/Inc/lora_sx1276.h ../Core/Inc/main.h ../Core/Inc/arm_math.h \
+ ../Drivers/CMSIS/Include/core_cm7.h ../Core/Inc/fir_coeffs1400-2600hz.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -65,3 +66,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/lora_sx1276.h:
 ../Core/Inc/main.h:
+../Core/Inc/arm_math.h:
+../Drivers/CMSIS/Include/core_cm7.h:
+../Core/Inc/fir_coeffs1400-2600hz.h:

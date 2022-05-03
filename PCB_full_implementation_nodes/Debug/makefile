@@ -60,8 +60,8 @@ all: main-build
 main-build: pcb.elf secondary-outputs
 
 # Tool invocations
-pcb.elf pcb.map: $(OBJS) $(USER_OBJS) /Users/vk/Downloads/pcb_fixed/STM32F446ZETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "pcb.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/vk/Downloads/pcb_fixed/STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="pcb.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+pcb.elf pcb.map: $(OBJS) $(USER_OBJS) /Users/vk/Documents/ucsb/senior/spring/ece189c/CACI_capstone/PCB_full_implementation_nodes/STM32F446ZETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "pcb.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/vk/Documents/ucsb/senior/spring/ece189c/CACI_capstone/PCB_full_implementation_nodes/STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="pcb.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
