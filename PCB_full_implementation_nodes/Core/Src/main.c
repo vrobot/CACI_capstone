@@ -28,11 +28,12 @@
 #include "lora_sx1276.h"
 #include "string.h"
 #include "arm_math.h"
-#include "fir_coeffs1400-2600hz.h"
+#include "fir_coeffs1400-2600hz_90.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#define LORA_TRANSMIT 1
 #define CLAP_THRESHOLD 100.0f
 #define CLAP_DURATION 5
 #define MIC_SAMPLE_FREQUENCY 44000
@@ -42,7 +43,7 @@
 #define MIC_SAMPLES_PER_PACKET (MIC_SAMPLES_PER_MS * MIC_MS_PER_PACKET) // == 960
 #define MOVING_AVG_THRESHOLD CLAP_THRESHOLD
 #define MOVING_AVG_LEN CLAP_DURATION
-#define NUM_SEND_PACKETS 100
+#define NUM_SEND_PACKETS 10
 #define SEND_LEN (255 * NUM_SEND_PACKETS)
 #define NODE 1
 
@@ -55,7 +56,7 @@
 #endif
 
 #define BLOCK_SIZE MIC_SAMPLES_PER_PACKET / 2
-#define FILTER_LEN 101
+#define FILTER_LEN 90
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -108,10 +109,10 @@ uint8_t iterfacing_failed[] = "Interfacing FAILED";
 uint8_t transmission_success[] = "Transmission SUCCESS";
 uint8_t transmission_failed[] = "Transmission FAILED";
 
-uint8_t GPS_buffer[1024];
+uint8_t GPS_buffer[2048];
 
 
-char buffStr[1024];
+char buffStr[2048];
 char nmeaSnt[80];
 /*
 char lat[12];
@@ -150,55 +151,27 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	//HAL_UART_Transmit(&huart1, GPS_buffer, 255, 10);
-	// GPS_circular_buffer[head_gps] = GPS_tmp;
-	// head_gps = (head_gps + 1) % 128;
-	// memcpy(GPS_buffer, GPS_circular_buffer+head_gps, (128)-head_gps);
-	// memcpy(GPS_buffer+(128)-head_gps, GPS_circular_buffer, head_gps);
-	// uint8_t rmc_message[6];
-	// memcpy(rmc_message, GPS_buffer, 6);
-	// HAL_UART_Transmit(&huart1, &GPS_tmp, 1, 100);
-	// if(strcmp(rmc_message, "$RMC") == 0){
-		// char *chEnd = strchr(GPS_buffer+2, '$') < strchr(GPS_buffer+2, 'G') ? strchr(GPS_buffer+2, '$') : strchr(GPS_buffer+2, 'G');
-		// idxEnd = (int)(chEnd - (char *) GPS_buffer);
-		// memcpy(GPS_transmit_buf, GPS_buffer, idxEnd);
-		//HAL_UART_Transmit(&huart1, GPS_transmit_buf, idxEnd, 100);
-	// }
-
-   //HAL_UART_Receive_DMA(&huart2, &GPS_tmp, 1);
-if (huart == &huart2){
-	//send++;
-	//if (send == 10){
+	if (huart == &huart2){
 		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_4);
-	//HAL_UART_Transmit(&huart1, GPS_buffer, 255, 10);
-	//send = 0;
-	//}
-	  char *string;
-			memset(buffStr, 0, 1024);
-			sprintf(buffStr, "%s", GPS_buffer);
-			string = strdup(buffStr);
-			//data = strstr(string, "$GNGLL");
-			//HAL_UART_Transmit(&huart2, (uint8_t*)data, 50, 70);
 
-			char* token;
-			while ((token = strsep(&string, "\n")) != NULL) {
-				memset(nmeaSnt, 0, 80);
-				sprintf(nmeaSnt, "%s\n\r", token);
-				if (((strstr(nmeaSnt, "$GPRMC") != 0) || (strstr(nmeaSnt, "$GPGLL") != 0) || (strstr(nmeaSnt, "$GPGGA") != 0)) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
-					//Raw Data
-					memset(GPS_latest_data, 0, 65);
-					memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
-					HAL_UART_Transmit(&huart1, (uint8_t*)nmeaSnt, strlen(nmeaSnt), 70);
+		char *string;
+		memset(buffStr, 0, 2048);
+		sprintf(buffStr, "%s", GPS_buffer);
+		string = strdup(buffStr);
 
-
-				}
-
+		char* token;
+		while ((token = strsep(&string, "\n")) != NULL) {
+			memset(nmeaSnt, 0, 80);
+			sprintf(nmeaSnt, "%s\n\r", token);
+			if (((strstr(nmeaSnt, "$GPRMC") != 0) || (strstr(nmeaSnt, "$GPGLL") != 0) || (strstr(nmeaSnt, "$GPGGA") != 0)) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
+				//Raw Data
+				memset(GPS_latest_data, 0, 65);
+				memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
+				HAL_UART_Transmit(&huart1, (uint8_t*)nmeaSnt, strlen(nmeaSnt), 70);
 			}
-		//	HAL_Delay(20);
-			HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1024);
-
-//	HAL_UART_Receive_DMA(&huart2, GPS_buffer, 255);
-}
+		}
+		HAL_UART_Receive_DMA(&huart2, GPS_buffer, 2048);
+	}
 }
 /* USER CODE END 0 */
 
@@ -266,13 +239,14 @@ int main(void)
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
-  HAL_UART_Receive_DMA(&huart2, GPS_buffer, 1024);
+  HAL_UART_Receive_DMA(&huart2, GPS_buffer, 2048);
 
+#if LORA_TRANSMIT
   uint8_t res = lora_init(&lora, &hspi1, NSS_GPIO_Port, NSS_Pin, LORA_BASE_FREQUENCY_US);
   if (res != LORA_OK) {
-	  // HAL_UART_Transmit(&huart1, iterfacing_failed, sizeof(iterfacing_failed), 1000);
+	  HAL_UART_Transmit(&huart1, iterfacing_failed, sizeof(iterfacing_failed), 1000);
   }
-
+#endif
 
   /* USER CODE END 2 */
 
@@ -634,26 +608,11 @@ void sendData(volatile int32_t *data_in) {
   if (_running) {
       for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
 
-        int16_t sample_left = (int16_t) ((data_in[0]>>8) & 0xffff);
-        // int16_t sample_right = (int16_t) ((data_in[1]>>8) & 0xffff);
-        float   sample_inf = (float) sample_left;
-       // float filt;
-      //  arm_fir_f32(&S, &sample_inf, &filt, blockSize);
-
-
         moving_sum += (int16_t) fabsf(filt[i]); // * abs(sample_right);
         moving_sum -= (int16_t) abs(circular_buf_mov[tail_mov]); // * abs(circular_buf_mov_right[tail_mov]);
-        // moving_sum_left += abs(sample_left);
-        // moving_sum_left -= abs(circular_buf_mov_left[tail_mov]);
-        // moving_sum_right += abs(sample_right);
-        // moving_sum_right -= abs(circular_buf_mov_right[tail_mov]);
     	circular_buf_mov[tail_mov] = (int16_t) filt[i];
-    	// circular_buf_mov_right[tail_mov] = sample_right;
-    	circular_buf_full[tail_full] = (int16_t) filt[i]; // + (float) sample_right)/2);
+    	circular_buf_full[tail_full] = (int16_t) filt[i];
         moving_avg = moving_sum / MOVING_AVG_LEN;
-    	// moving_avg_left = ((float) moving_sum_left)/(MOVING_AVG_LEN);
-    	// moving_avg_right = ((float) moving_sum_right)/(MOVING_AVG_LEN);
-
 
     	if ((counter > 0) && (!done)){
     		counter++;
@@ -665,9 +624,12 @@ void sendData(volatile int32_t *data_in) {
     			memcpy(metaData, &startPadding, 4);
     			memcpy(metaData+4, &timerVal, 4);
     			memcpy(metaData+8, &devID, 4);
-    			// memcpy(metaData+12, GPS_transmit_buf, idxEnd);
-    			// memcpy(metaData+12+idxEnd, &endMetaPadding, 4);
-/*
+
+    			uint8_t sendBuf[SEND_LEN*2];
+    			memcpy(sendBuf, &circular_buf_full[tail_full], ((SEND_LEN)-tail_full)*2);
+    			memcpy(&sendBuf[(SEND_LEN-tail_full)*2], circular_buf_full, tail_full*2);
+
+#if LORA_TRANSMIT
     			uint8_t packet_res = lora_send_packet(&lora, metaData, 12);
 
     			if (packet_res != LORA_OK) {
@@ -678,14 +640,14 @@ void sendData(volatile int32_t *data_in) {
     			}
 
     			while(lora_is_transmitting(&lora)); // non-blocking delay
-*/
-    			uint8_t sendBuf[SEND_LEN*2];
-    			memcpy(sendBuf, &circular_buf_full[tail_full], ((SEND_LEN)-tail_full)*2);
-    			memcpy(&sendBuf[(SEND_LEN-tail_full)*2], circular_buf_full, tail_full*2);
-    		    HAL_UART_Transmit(&huart1, (uint8_t*) sendBuf, SEND_LEN*2, 1000);
 
-/*
-    			for(int send_loop_cnt = 0; send_loop_cnt < (SEND_LEN/255 + (SEND_LEN % 255 != 0)); send_loop_cnt++){
+#else
+    		    HAL_UART_Transmit(&huart1, (uint8_t*) sendBuf, SEND_LEN*2, 1000);
+#endif
+
+#if LORA_TRANSMIT
+
+    			for(int send_loop_cnt = 0; send_loop_cnt < ((SEND_LEN*2)/255 + ((SEND_LEN*2) % 255 != 0)); send_loop_cnt++){
     				packet_res = lora_send_packet(&lora, sendBuf+(255*send_loop_cnt), 255);
     				if (packet_res != LORA_OK) {
     					HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
@@ -696,7 +658,7 @@ void sendData(volatile int32_t *data_in) {
     	    		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_3);
     				while(lora_is_transmitting(&lora)); // non-blocking delay
     			}
-*/
+#endif
 
         		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
     			done = 1;
