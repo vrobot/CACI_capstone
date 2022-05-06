@@ -146,7 +146,6 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart2){
-		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_4);
 		char *string;
 		memset(buffStr, 0, 2048);
 		sprintf(buffStr, "%s", GPS_buffer);
@@ -157,6 +156,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			memset(nmeaSnt, 0, 80);
 			sprintf(nmeaSnt, "%s\n\r", token);
 			if ((strstr(nmeaSnt, "$GPGLL") != 0) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
+				HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_RESET);
 				//Raw Data
 				memset(GPS_latest_data, 0, 65);
 				memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
@@ -224,7 +224,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_3);
-  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_SET);
 
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_5, GPIO_PIN_RESET);
