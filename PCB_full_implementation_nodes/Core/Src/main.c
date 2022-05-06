@@ -28,7 +28,7 @@
 #include "lora_sx1276.h"
 #include "string.h"
 #include "arm_math.h"
-#include "fir_coeffs1400-2600hz_90.h"
+#include "fir_coeffs1400-2600hz.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +56,7 @@
 #endif
 
 #define BLOCK_SIZE MIC_SAMPLES_PER_PACKET / 2
-#define FILTER_LEN 90
+#define FILTER_LEN 101
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -103,6 +103,7 @@ int done;
 uint32_t devID = NODE;
 uint32_t startPadding = 0xABABABAB;
 uint32_t endMetaPadding = 0xCDCDCDCD;
+uint32_t endPadding = 0xEFEFEFEF;
 lora_sx1276 lora;
 uint8_t iterfacing_success[] = "Interfacing SUCCESS";
 uint8_t iterfacing_failed[] = "Interfacing FAILED";
@@ -110,18 +111,9 @@ uint8_t transmission_success[] = "Transmission SUCCESS";
 uint8_t transmission_failed[] = "Transmission FAILED";
 
 uint8_t GPS_buffer[2048];
-
-
 char buffStr[2048];
 char nmeaSnt[80];
-/*
-char lat[12];
-char lon[13];
-char tim[6];
-*/
-uint8_t GPS_tmp;
 uint8_t GPS_latest_data[65];
-int send = 0;
 
 arm_fir_instance_f32 S;
 float buffer[FILTER_LEN + BLOCK_SIZE - 1];
@@ -143,9 +135,11 @@ void sendData(volatile int32_t *data_in);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-int32_t timerVal;
+uint32_t timerVal;
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+	// uint32_t test = TIM2->CNT;
+	// HAL_UART_Transmit(&huart1, (uint8_t*)&test, 4, 70);
 	__HAL_TIM_SET_COUNTER(htim,0);
 }
 
@@ -153,7 +147,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart2){
 		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_4);
-
 		char *string;
 		memset(buffStr, 0, 2048);
 		sprintf(buffStr, "%s", GPS_buffer);
@@ -167,7 +160,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				//Raw Data
 				memset(GPS_latest_data, 0, 65);
 				memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
-				HAL_UART_Transmit(&huart1, (uint8_t*)nmeaSnt, strlen(nmeaSnt), 70);
+				// HAL_UART_Transmit(&huart1, (uint8_t*)GPS_latest_data, strlen(GPS_latest_data), 70);
 			}
 		}
 		HAL_UART_Receive_DMA(&huart2, GPS_buffer, 2048);
@@ -199,7 +192,7 @@ int main(void)
   memset(circular_buf_mov_right, 0, MOVING_AVG_LEN*sizeof(int16_t));
   memset(circular_buf_full, 0, SEND_LEN*sizeof(int16_t));
   memset(_sampleBuffer, 0, MIC_SAMPLES_PER_PACKET*2*sizeof(int32_t));
-  arm_fir_init_f32(&S, FILTER_LEN, coeffs, buffer, blockSize);
+  arm_fir_init_f32(&S, FILTER_LEN, (float *) coeffs, buffer, blockSize);
 
 
 
@@ -276,7 +269,7 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
@@ -286,7 +279,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
-  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLN = 360;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
   RCC_OscInitStruct.PLL.PLLQ = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
@@ -294,16 +287,22 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  /** Activate the Over-Drive mode
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
+  {
+    Error_Handler();
+  }
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLRCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -605,84 +604,95 @@ void sendData(volatile int32_t *data_in) {
 	arm_fir_f32(&S, data_in_float, filt, blockSize);
 
 
-  if (_running) {
-      for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
+	if (_running) {
+		for (uint16_t i = 0; i < MIC_SAMPLES_PER_PACKET / 2; i++) {
 
-        moving_sum += (int16_t) fabsf(filt[i]); // * abs(sample_right);
-        moving_sum -= (int16_t) abs(circular_buf_mov[tail_mov]); // * abs(circular_buf_mov_right[tail_mov]);
-    	circular_buf_mov[tail_mov] = (int16_t) filt[i];
-    	circular_buf_full[tail_full] = (int16_t) filt[i];
-        moving_avg = moving_sum / MOVING_AVG_LEN;
+			moving_sum += (int16_t) fabsf(filt[i]); // * abs(sample_right);
+			moving_sum -= (int16_t) abs(circular_buf_mov[tail_mov]); // * abs(circular_buf_mov_right[tail_mov]);
+			circular_buf_mov[tail_mov] = (int16_t) filt[i];
+			circular_buf_full[tail_full] = (int16_t) filt[i];
+			moving_avg = moving_sum / MOVING_AVG_LEN;
 
-    	if ((counter > 0) && (!done)){
-    		counter++;
-    		if (counter == (SEND_LEN/2)){ // TODO: need to change this to SEND_LEN-100;
+			if ((counter > 0) && (!done)){
+				counter++;
+				if (counter == (SEND_LEN/2)){ // TODO: need to change this to SEND_LEN-100;
 
-    			for(int delay = 0; delay < NODE_DELAY; delay++); // non-blocking delay used to offset the transmissions of each node to prevent garbled transmissions
+					for(int delay = 0; delay < NODE_DELAY; delay++); // non-blocking delay used to offset the transmissions of each node to prevent garbled transmissions
 
-    			uint8_t metaData[12];
-    			memcpy(metaData, &startPadding, 4);
-    			memcpy(metaData+4, &timerVal, 4);
-    			memcpy(metaData+8, &devID, 4);
+					uint8_t GPS_data_len = (uint8_t) strlen((char *) GPS_latest_data);
+					uint8_t metaData[16+GPS_data_len];
+					memcpy(metaData, &startPadding, 4);
+					memcpy(metaData+4, &timerVal, 4);
+					memcpy(metaData+8, &devID, 4);
+					memcpy(metaData+12, GPS_latest_data, GPS_data_len);
+					memcpy(metaData+12+GPS_data_len, &endMetaPadding, 4);
 
-    			uint8_t sendBuf[SEND_LEN*2];
-    			memcpy(sendBuf, &circular_buf_full[tail_full], ((SEND_LEN)-tail_full)*2);
-    			memcpy(&sendBuf[(SEND_LEN-tail_full)*2], circular_buf_full, tail_full*2);
+					uint8_t sendBuf[SEND_LEN*2];
+					memcpy(sendBuf, &circular_buf_full[tail_full], ((SEND_LEN)-tail_full)*2);
+					memcpy(&sendBuf[(SEND_LEN-tail_full)*2], circular_buf_full, tail_full*2);
 
 #if LORA_TRANSMIT
-    			uint8_t packet_res = lora_send_packet(&lora, metaData, 12);
+					uint8_t packet_res = lora_send_packet(&lora, metaData, 16+GPS_data_len);
 
-    			if (packet_res != LORA_OK) {
-    				HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
-    			}
-    			else {
-    				HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
-    			}
+					if (packet_res != LORA_OK) {
+						HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
+					}
+					else {
+						HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
+					}
 
-    			while(lora_is_transmitting(&lora)); // non-blocking delay
+					while(lora_is_transmitting(&lora)); // non-blocking delay
 
 #else
-    		    HAL_UART_Transmit(&huart1, (uint8_t*) sendBuf, SEND_LEN*2, 1000);
+					HAL_UART_Transmit(&huart1, (uint8_t*) sendBuf, SEND_LEN*2, 1000);
 #endif
 
 #if LORA_TRANSMIT
 
-    			for(int send_loop_cnt = 0; send_loop_cnt < ((SEND_LEN*2)/255 + ((SEND_LEN*2) % 255 != 0)); send_loop_cnt++){
-    				packet_res = lora_send_packet(&lora, sendBuf+(255*send_loop_cnt), 255);
-    				if (packet_res != LORA_OK) {
-    					HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
-    				}
-    				else {
-    					HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
-    				}
-    	    		HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_3);
-    				while(lora_is_transmitting(&lora)); // non-blocking delay
-    			}
+					for(int send_loop_cnt = 0; send_loop_cnt < ((SEND_LEN*2)/255 + ((SEND_LEN*2) % 255 != 0)); send_loop_cnt++){
+						packet_res = lora_send_packet(&lora, sendBuf+(255*send_loop_cnt), 255);
+						if (packet_res != LORA_OK) {
+							HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
+						}
+						else {
+							HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
+						}
+						HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_3);
+						while(lora_is_transmitting(&lora)); // non-blocking delay
+					}
+
+					packet_res = lora_send_packet(&lora, (uint8_t *) &endPadding, 4);
+					if (packet_res != LORA_OK) {
+						HAL_UART_Transmit(&huart1, &packet_res, sizeof(packet_res), 1000);
+					}
+					else {
+						HAL_UART_Transmit(&huart1, transmission_success, sizeof(transmission_success), 1000);
+					}
 #endif
 
-        		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
-    			done = 1;
-    		}
-    	}
+					HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
+					done = 1;
+				}
+			}
 
-    	if ((moving_avg >= MOVING_AVG_THRESHOLD) && (counter == 0)){
-    		timerVal = TIM2->CNT;
-    		HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
-    		counter += 1;
-    		done = 0;
+			if ((moving_avg >= MOVING_AVG_THRESHOLD) && (counter == 0)){
+				timerVal = TIM2->CNT;
+				HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
+				counter += 1;
+				done = 0;
+			}
 
-    	}
-        tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
-        head_mov = (head_mov + 1) % (MOVING_AVG_LEN);
+			tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
+			head_mov = (head_mov + 1) % (MOVING_AVG_LEN);
 
-        tail_full = (tail_full + 1) % (SEND_LEN);
-        head_full = (head_full + 1) % (SEND_LEN);
+			tail_full = (tail_full + 1) % (SEND_LEN);
+			head_full = (head_full + 1) % (SEND_LEN);
 
-        data_in += 2;
-      }
+			data_in += 2;
+		}
 
 
-  }
+	}
 }
 
 /* USER CODE END 4 */
