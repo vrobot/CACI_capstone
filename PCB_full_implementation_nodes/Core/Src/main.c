@@ -156,7 +156,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		while ((token = strsep(&string, "\n")) != NULL) {
 			memset(nmeaSnt, 0, 80);
 			sprintf(nmeaSnt, "%s\n\r", token);
-			if (((strstr(nmeaSnt, "$GPRMC") != 0) || (strstr(nmeaSnt, "$GPGLL") != 0) || (strstr(nmeaSnt, "$GPGGA") != 0)) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
+			if ((strstr(nmeaSnt, "$GPGLL") != 0) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
 				//Raw Data
 				memset(GPS_latest_data, 0, 65);
 				memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
