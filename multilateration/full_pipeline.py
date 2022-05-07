@@ -95,7 +95,7 @@ def parse_uart(meta, sound):
 
     # convert to samples
     output_time = int(reversed_time, 16)
-    output_time /= 84000000.0
+    output_time /= 90000000.0
     
 
     raw_name = meta[8:16]
