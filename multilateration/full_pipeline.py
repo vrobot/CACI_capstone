@@ -7,6 +7,7 @@ import scipy
 import matplotlib.pyplot as plt
 import random
 import math
+import sys
 
 from itertools import combinations
 
@@ -224,9 +225,9 @@ def LST(nodes, times, v):
 # Universal Variables
 
 SPEED_OF_SOUND = 343.0 / 111000.0
-NUM_NODES = 3
+NUM_NODES = int(sys.argv[2])
 SAMPLE_RATE = 46875
-PORT = 'COM7'
+PORT = sys.argv[1]
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -256,8 +257,8 @@ for i in range(NUM_NODES):
     meta, sound = get_uart(port=PORT, baud=115200, timeout_val=0)
     
     # test input
-    #meta = m[i].lower()
-    #sound = s[i].lower()
+    # meta = m[i].lower()
+    # sound = s[i].lower()
     
 
     node_list.append(parse_uart(meta, sound))
@@ -290,6 +291,13 @@ for node in node_list[1:]:
 pred_x, pred_y = LST(node_locs, node_times, SPEED_OF_SOUND)
 
 pred_x = pred_x / long_multiplier
+
+frac_x, whole_x = math.modf(pred_x)
+pred_x = whole_x + (frac_x * 100) / 60
+
+frac_y, whole_y = math.modf(pred_y)
+pred_y = whole_y + (frac_y * 100) / 60
+
 print(long_multiplier)
 print('predicited latititude: ', pred_x)
 print('predicited longitude: ', pred_y)
