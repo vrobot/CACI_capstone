@@ -75,8 +75,8 @@ def get_uart(port, baud, timeout_val):
 
     meta = find_str(sound_data, meta_start, meta_end)
     sound = find_str(sound_data, sound_start, sound_end)
-    print('meta_data: ', meta)
-    print('sound_data: ', sound)
+    #print('meta_data: ', meta)
+    #print('sound_data: ', sound)
 
     return meta, sound
 
@@ -104,8 +104,15 @@ def parse_uart(meta, sound):
     # convert Raw gps Data
     raw_gps = meta[16:]
     gps_processed = NMEAReader.parse(bytes.fromhex(raw_gps).decode('utf-8'))
+    
+
     x = float(gps_processed.payload[2])/100
+    frac_x, whole_x = math.modf(x)
+    x = whole_x + (frac_x * 100) / 60
+
     y = float(gps_processed.payload[0])/100
+    frac_y, whole_y = math.modf(y)
+    y = whole_y + (frac_y * 100) / 60
 
     if gps_processed.payload[1] == 'S':
         y = -1*y
@@ -113,10 +120,9 @@ def parse_uart(meta, sound):
     if gps_processed.payload[3] == 'W':
         x = -1*x
 
-
-
     print(x)
     print(y)
+
     output_gps = [x, y]
 
     #convert raw sound to usable sound
@@ -178,7 +184,7 @@ def cross_correlation(time_a, sample_a, time_b, sample_b, sample_rate):
 
 def LST(nodes, times, v):
 
-	#print(nodes)
+	print(nodes)
 	#print(times)
 
 	#print(np.array(nodes))
@@ -186,7 +192,7 @@ def LST(nodes, times, v):
 
 	nodes = np.concatenate((np.array(nodes), np.array([times]).T), axis=1).tolist()
 	#nodes = zip(nodes,times)
-	print(nodes)
+	#print(nodes)
 	def equations(guess):
 			x, y, r = guess
 
@@ -254,11 +260,11 @@ node_list = []
 for i in range(NUM_NODES):
 	
 	# uart input
-    meta, sound = get_uart(port=PORT, baud=115200, timeout_val=0)
+    #meta, sound = get_uart(port=PORT, baud=115200, timeout_val=0)
     
     # test input
-    # meta = m[i].lower()
-    # sound = s[i].lower()
+    meta = m[i].lower()
+    sound = s[i].lower()
     
 
     node_list.append(parse_uart(meta, sound))
@@ -292,12 +298,39 @@ pred_x, pred_y = LST(node_locs, node_times, SPEED_OF_SOUND)
 
 pred_x = pred_x / long_multiplier
 
-frac_x, whole_x = math.modf(pred_x)
-pred_x = whole_x + (frac_x * 100) / 60
+#frac_x, whole_x = math.modf(pred_x)
+#pred_x_decimal = whole_x + (frac_x * 100) / 60
 
-frac_y, whole_y = math.modf(pred_y)
-pred_y = whole_y + (frac_y * 100) / 60
+#frac_y, whole_y = math.modf(pred_y)
+#pred_y_decimal = whole_y + (frac_y * 100) / 60
 
-print(long_multiplier)
-print('predicited latititude: ', pred_x)
-print('predicited longitude: ', pred_y)
+
+print('predicited latititude: ', pred_y)
+print('predicited longitude: ', pred_x)
+
+#x, y
+true_sound = [0, 0]
+
+BBox = (-119.87359, -119.87242, 34.42555, 34.42649)
+girsh_park_map = plt.imread('girsh_baseball_map.png')
+
+#print(node_locs)
+for i, n in enumerate(node_locs):
+	node_locs[i][0] = n[0] / long_multiplier
+
+	#frac_x, whole_x = math.modf(n[0])
+	#node_locs[i][0] = whole_x + (frac_x * 100) / 60
+	
+	#frac_y, whole_y = math.modf(n[1])
+	#node_locs[i][1] = whole_y + (frac_y * 100) / 60
+
+#print(node_locs)
+
+plt.scatter(node_locs[0][0], node_locs[0][1], color = 'black', marker='$A$')
+plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
+plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
+
+plt.scatter(true_sound[0], true_sound[1], color = 'red', marker='o')
+plt.scatter(pred_x, pred_y, color = 'blue', marker='x')
+plt.imshow(girsh_park_map, zorder=0, extent = BBox, aspect= 'equal')
+plt.show()
