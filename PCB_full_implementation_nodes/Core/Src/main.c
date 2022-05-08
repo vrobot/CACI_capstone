@@ -45,7 +45,7 @@
 #define MOVING_AVG_LEN CLAP_DURATION
 #define NUM_SEND_PACKETS 10
 #define SEND_LEN (255 * NUM_SEND_PACKETS)
-#define NODE 3
+#define NODE 1
 
 #if (NODE == 1)
 #define NODE_DELAY 0
@@ -114,12 +114,11 @@ uint8_t GPS_buffer[2048];
 char buffStr[2048];
 char nmeaSnt[80];
 uint8_t GPS_latest_data[65];
+int GPSidxint = 0;
 
 arm_fir_instance_f32 S;
 float buffer[FILTER_LEN + BLOCK_SIZE - 1];
 uint32_t blockSize = BLOCK_SIZE;
-
-int GPSidxint = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -140,8 +139,6 @@ void sendData(volatile int32_t *data_in);
 uint32_t timerVal;
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
-	// uint32_t test = TIM2->CNT;
-	// HAL_UART_Transmit(&huart1, (uint8_t*)&test, 4, 70);
 	__HAL_TIM_SET_COUNTER(htim,0);
 }
 
@@ -165,9 +162,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 					GPSidxint = GPSidx-nmeaSnt;
 				}
 				memset(GPS_latest_data, 0, 65);
-				if(GPSidx)
 				memcpy(GPS_latest_data, nmeaSnt, GPSidxint);
-				// HAL_UART_Transmit(&huart1, (uint8_t*)GPS_latest_data, strlen(GPS_latest_data), 70);
 			}
 		}
 		HAL_UART_Receive_DMA(&huart2, GPS_buffer, 2048);
