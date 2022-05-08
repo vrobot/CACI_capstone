@@ -45,7 +45,7 @@
 #define MOVING_AVG_LEN CLAP_DURATION
 #define NUM_SEND_PACKETS 10
 #define SEND_LEN (255 * NUM_SEND_PACKETS)
-#define NODE 1
+#define NODE 3
 
 #if (NODE == 1)
 #define NODE_DELAY 0
@@ -118,6 +118,8 @@ uint8_t GPS_latest_data[65];
 arm_fir_instance_f32 S;
 float buffer[FILTER_LEN + BLOCK_SIZE - 1];
 uint32_t blockSize = BLOCK_SIZE;
+
+int GPSidxint = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -158,8 +160,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 			if ((strstr(nmeaSnt, "$GPGLL") != 0) && strlen(nmeaSnt) > 48 && strlen(nmeaSnt) < 65) {
 				HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_RESET);
 				//Raw Data
+				char* GPSidx = strchr(nmeaSnt, '\n');
+				if (GPSidx){
+					GPSidxint = GPSidx-nmeaSnt;
+				}
 				memset(GPS_latest_data, 0, 65);
-				memcpy(GPS_latest_data, nmeaSnt, strlen(nmeaSnt));
+				if(GPSidx)
+				memcpy(GPS_latest_data, nmeaSnt, GPSidxint);
 				// HAL_UART_Transmit(&huart1, (uint8_t*)GPS_latest_data, strlen(GPS_latest_data), 70);
 			}
 		}
@@ -619,7 +626,7 @@ void sendData(volatile int32_t *data_in) {
 
 					for(int delay = 0; delay < NODE_DELAY; delay++); // non-blocking delay used to offset the transmissions of each node to prevent garbled transmissions
 
-					uint8_t GPS_data_len = (uint8_t) strlen((char *) GPS_latest_data);
+					uint8_t GPS_data_len = (uint8_t) GPSidxint; //strlen((char *) GPS_latest_data);
 					uint8_t metaData[16+GPS_data_len];
 					memcpy(metaData, &startPadding, 4);
 					memcpy(metaData+4, &timerVal, 4);
