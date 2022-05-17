@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import random
 import math
 import sys
+import ast
 
 from itertools import combinations
 
@@ -235,6 +236,8 @@ def LST(nodes, times, v):
 #-----------------------------------------------------------------------------
 # Universal Variables
 SAVE_TO_FILE = True
+READ_FROM_FILE = False
+FILE_NAME = 'test_result_17-05-22_12-47-35.csv'
 SPEED_OF_SOUND = 343.0 / 111000.0
 NUM_NODES = int(sys.argv[2])
 SAMPLE_RATE = 46875
@@ -262,22 +265,33 @@ s = [
 #formatting is [output_name, output_time, output_gps, output_sound]
 node_list = []
 
-for i in range(NUM_NODES):
+if READ_FROM_FILE:
+    node_list = list(csv.reader(open(FILE_NAME)))
+
+    for i in range(NUM_NODES):
+        for j in range(4):
+            res = ast.literal_eval(node_list[i][j])
+
+            node_list[i][j] = res
+
+else:
+    for i in range(NUM_NODES):
     
-    # uart input
-    #meta, sound = get_uart(port=PORT, baud=115200, timeout_val=0)
+        # uart input
+        #meta, sound = get_uart(port=PORT, baud=115200, timeout_val=0)
     
-    # test input
-    meta = m[i].lower()
-    sound = s[i].lower()
+        # test input
+        meta = m[i].lower()
+        sound = s[i].lower()
     
 
-    node_list.append(parse_uart(meta, sound, SAVE_TO_FILE))
+        node_list.append(parse_uart(meta, sound, SAVE_TO_FILE))
 
-node_list[0].append(0)
+    node_list[0].append(0)
 print(node_list)
+
 # write to file
-if SAVE_TO_FILE:
+if SAVE_TO_FILE and not(READ_FROM_FILE):
     now = datetime.now()
     # dd/mm/YY H:M:S
     dt_string = now.strftime("%d-%m-%y_%H-%M-%S")
@@ -286,7 +300,6 @@ if SAVE_TO_FILE:
     print("date and time =", file_name)
  
     # data to be written row-wise in csv file
-    data = [['Geeks'], [4], ['geeks !']]
  
     # opening the csv file in 'w+' mode
     file = open(file_name, 'w+', newline ='')
@@ -298,7 +311,7 @@ if SAVE_TO_FILE:
 
 
 #adjust for fact that longitude is terrible
-long_multiplier = 180 / (math.sqrt(180**2 - node_list[0][2][1]**2) + .000001)
+long_multiplier = 180 / (math.sqrt(180**2 - node_list[0][2][1]**2) + .00000001)
 
 node_locs = []
 for node in node_list:
@@ -351,12 +364,15 @@ for i, n in enumerate(node_locs):
     #node_locs[i][1] = whole_y + (frac_y * 100) / 60
 
 #print(node_locs)
+for i in range(NUM_NODES):
+    mark = '$'+ str(i) + '$'
+    plt.scatter(node_locs[i][0], node_locs[i][1], color = 'black', marker=mark)
 
-plt.scatter(node_locs[0][0], node_locs[0][1], color = 'black', marker='$A$')
-plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
-plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
+#plt.scatter(node_locs[0][0], node_locs[0][1], color = 'black', marker='$A$')
+#plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
+#plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
 
-plt.scatter(true_sound[0], true_sound[1], color = 'red', marker='o')
+#plt.scatter(true_sound[0], true_sound[1], color = 'red', marker='o')
 plt.scatter(pred_x, pred_y, color = 'blue', marker='x')
 plt.imshow(girsh_park_map, zorder=0, extent = BBox, aspect= 'equal')
 plt.show()
