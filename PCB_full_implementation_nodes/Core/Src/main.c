@@ -45,7 +45,7 @@
 #define MOVING_AVG_LEN CLAP_DURATION
 #define NUM_SEND_PACKETS 10
 #define SEND_LEN (255 * NUM_SEND_PACKETS)
-#define NODE 1
+#define NODE 2
 
 #if (NODE == 1)
 #define NODE_DELAY 0
@@ -53,7 +53,11 @@
 #define NODE_DELAY 100000000
 #elif (NODE == 3)
 #define NODE_DELAY 200000000
+#elif (NODE == 4)
+#define NODE_DELAY 300000000
 #endif
+
+#define TOTAL_DELAY 300000000
 
 #define BLOCK_SIZE MIC_SAMPLES_PER_PACKET / 2
 #define FILTER_LEN 101
@@ -85,11 +89,9 @@ DMA_HandleTypeDef hdma_usart2_rx;
 volatile int32_t *_sampleBuffer[MIC_SAMPLES_PER_PACKET * 2];
 int16_t circular_buf_mov[MOVING_AVG_LEN];
 int16_t circular_buf_mov_right[MOVING_AVG_LEN];
-uint32_t head_mov;
 uint32_t tail_mov;
 
 int16_t circular_buf_full[SEND_LEN];
-uint32_t head_full;
 uint32_t tail_full;
 float moving_sum;
 float moving_avg;
@@ -178,9 +180,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   _running = false;
-  head_mov = 0;
   tail_mov = 1;
-  head_full = 0;
   tail_full = 1;
   moving_sum = 0;
   moving_avg = 0;
@@ -229,8 +229,8 @@ int main(void)
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_4, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_SET);
 
-  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_5, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
   HAL_GPIO_WritePin(RST_GPIO_Port, RST_Pin, GPIO_PIN_SET);
@@ -673,7 +673,22 @@ void sendData(volatile int32_t *data_in) {
 #endif
 
 					HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
-					done = 1;
+					for(int delay = 0; delay < (TOTAL_DELAY - NODE_DELAY); delay++);
+					HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_SET);
+					tail_mov = 1;
+					tail_full = 1;
+					moving_sum = 0;
+					moving_avg = 0;
+					moving_sum_left = 0;
+					moving_avg_left = 0;
+					moving_sum_right = 0;
+					moving_avg_right = 0;
+					counter = 0;
+					done = 0;
+					memset(circular_buf_mov, 0, MOVING_AVG_LEN*sizeof(int16_t));
+					memset(circular_buf_mov_right, 0, MOVING_AVG_LEN*sizeof(int16_t));
+					memset(circular_buf_full, 0, SEND_LEN*sizeof(int16_t));
+					memset(_sampleBuffer, 0, MIC_SAMPLES_PER_PACKET*2*sizeof(int32_t));
 				}
 			}
 
@@ -685,10 +700,7 @@ void sendData(volatile int32_t *data_in) {
 			}
 
 			tail_mov = (tail_mov + 1) % (MOVING_AVG_LEN);
-			head_mov = (head_mov + 1) % (MOVING_AVG_LEN);
-
 			tail_full = (tail_full + 1) % (SEND_LEN);
-			head_full = (head_full + 1) % (SEND_LEN);
 
 			data_in += 2;
 		}
