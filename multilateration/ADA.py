@@ -241,7 +241,7 @@ def LST(nodes, times, v):
 # Universal Variables
 SAVE_TO_FILE = True
 READ_FROM_FILE = False
-FILE_NAME = 'test_result_17-05-22_12-47-35.csv'
+FILE_NAME = 'test_result_22-05-22_18-40-52.csv'
 SPEED_OF_SOUND = 343.0 / 111000.0
 NUM_NODES = int(sys.argv[2])
 SAMPLE_RATE = 46875
@@ -341,9 +341,9 @@ print('predicited latititude: ', pred_y)
 print('predicited longitude: ', pred_x)
 
 #x, y
-true_sound = [0, 0]
+true_sound = [-119.86310, 034.41375]
 
-BBox = (-119.86416, -119.86274, 34.41415, 34.41333)
+BBox = (-119.86416, -119.86271, 34.41415, 34.41333)
 #girsh_park_map = plt.imread('girsh_baseball_map.png')
 IV_park_map = plt.imread('IV_park_map.png')
 
@@ -357,16 +357,28 @@ for i, n in enumerate(node_locs):
     #frac_y, whole_y = math.modf(n[1])
     #node_locs[i][1] = whole_y + (frac_y * 100) / 60
 
-#print(node_locs)
+
+point_size = 40
+font_size = 8
+
 for i in range(NUM_NODES):
     mark = '$'+ str(i) + '$'
-    plt.scatter(node_locs[i][0], node_locs[i][1], color = 'black', marker=mark)
+    plt.scatter(node_locs[i][0], node_locs[i][1], s = point_size, color = 'black', marker=mark)
 
 #plt.scatter(node_locs[0][0], node_locs[0][1], color = 'black', marker='$A$')
 #plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
 #plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
 
-#plt.scatter(true_sound[0], true_sound[1], color = 'red', marker='o')
-plt.scatter(pred_x, pred_y, color = 'blue', marker='x')
+plt.scatter(true_sound[0], true_sound[1], s = point_size, color = 'red', marker='o', label='True sound location')
+plt.scatter(pred_x, pred_y, s = point_size, color = 'blue', marker='X', label='Predicted sound location')
+
+#whiffs on drawn graph
+plt.scatter(-999, -999, color = 'black', marker = '$N$', label='nodes')
+
 plt.imshow(IV_park_map, zorder=0, extent = BBox, aspect= 'equal')
+
+plt.legend(loc="upper left", fontsize=font_size)
+
+plt.axis('off')
+
 plt.show()
