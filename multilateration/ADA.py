@@ -151,10 +151,19 @@ def parse_uart(meta, sound, save_to_file):
     #print(output_time)
     return [output_name, output_time, output_gps, output_sound]
 
+def adjust_time(timea, timeb):
+    if ((timea - timeb) > 45000000):
+        timeb += 90000000
+    if ((timeb - timea) > 45000000):
+        timea += 90000000
+
+    return timea, timeb
+
 # add padding to make the timestamps line up
 #NOTE: use sound in secs not samples
 def pad_sound(time_a, sample_a, time_b, sample_b, sample_rate):
-    #if ((timea - timeb) > 45000000):
+    
+    timea, timeb = adjust_time(timea, timeb)
         
     offset = time_a - time_b
     offset *= sample_rate
