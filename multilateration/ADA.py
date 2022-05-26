@@ -163,7 +163,7 @@ def adjust_time(timea, timeb):
 #NOTE: use sound in secs not samples
 def pad_sound(time_a, sample_a, time_b, sample_b, sample_rate):
     
-    timea, timeb = adjust_time(timea, timeb)
+    time_a, time_b = adjust_time(time_a, time_b)
         
     offset = time_a - time_b
     offset *= sample_rate
@@ -252,11 +252,16 @@ def LST(nodes, times, v):
 # Universal Variables
 SAVE_TO_FILE = True
 READ_FROM_FILE = False
-FILE_NAME = 'test_result_22-05-22_18-40-52.csv'
+FILE_NAME = 'test_result_26-05-22_14-04-53.csv'
+SHOW_MAP = True
 SPEED_OF_SOUND = 343.0 / 111000.0
 NUM_NODES = int(sys.argv[2])
 SAMPLE_RATE = 46875
 PORT = sys.argv[1]
+
+#x, y
+#true_sound = [-119.8729, 34.42598] # girsh_1a, need more sig fig
+true_sound = [-119.87295, 34.42589] # girsh_1a, need more sig fig
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -351,13 +356,12 @@ pred_x = pred_x / long_multiplier
 print('predicited latititude: ', pred_y)
 print('predicited longitude: ', pred_x)
 
-#x, y
-true_sound = [-119.86310, 034.41375]
+if SHOW_MAP:
+    BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
+    #BBox = (-119.86416, -119.86271, 34.41415, 34.41333) # IV park
 
-# BBox = (-119.86416, -119.86271, 34.41415, 34.41333) IV park
-BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
-#girsh_park_map = plt.imread('girsh_baseball_map.png')
-IV_park_map = plt.imread('IV_park_map.png')
+    lmap = plt.imread('girsh_baseball_map.png')
+    #lmap = plt.imread('IV_park_map.png')
 
 #print(node_locs)
 for i, n in enumerate(node_locs):
@@ -374,7 +378,7 @@ point_size = 40
 font_size = 8
 
 for i in range(NUM_NODES):
-    mark = '$'+ str(i) + '$'
+    mark = '$'+ str(node_list[i][0]) + '$'
     plt.scatter(node_locs[i][0], node_locs[i][1], s = point_size, color = 'black', marker=mark)
 
 #plt.scatter(node_locs[0][0], node_locs[0][1], color = 'black', marker='$A$')
@@ -387,9 +391,10 @@ plt.scatter(pred_x, pred_y, s = point_size, color = 'blue', marker='X', label='P
 #whiffs on drawn graph
 plt.scatter(-999, -999, color = 'black', marker = '$N$', label='nodes')
 
-plt.imshow(IV_park_map, zorder=0, extent = BBox, aspect= 'equal')
+if SHOW_MAP:
+    plt.imshow(lmap, zorder=0, extent = BBox, aspect= 'equal')
 
-plt.legend(loc="upper left", fontsize=font_size)
+    plt.legend(loc="upper left", fontsize=font_size)
 
 plt.axis('off')
 
