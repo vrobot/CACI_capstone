@@ -154,6 +154,8 @@ def parse_uart(meta, sound, save_to_file):
 # add padding to make the timestamps line up
 #NOTE: use sound in secs not samples
 def pad_sound(time_a, sample_a, time_b, sample_b, sample_rate):
+    #if ((timea - timeb) > 45000000):
+        
     offset = time_a - time_b
     offset *= sample_rate
     offset = int(offset)
@@ -279,7 +281,7 @@ else:
     
 
         node_list.append(parse_uart(meta, sound, SAVE_TO_FILE))
-
+        print('node ', str(node_list[i][0]), ' recieved')
     node_list[0].append(0)
 print(node_list)
 
@@ -343,7 +345,8 @@ print('predicited longitude: ', pred_x)
 #x, y
 true_sound = [-119.86310, 034.41375]
 
-BBox = (-119.86416, -119.86271, 34.41415, 34.41333)
+# BBox = (-119.86416, -119.86271, 34.41415, 34.41333) IV park
+BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
 #girsh_park_map = plt.imread('girsh_baseball_map.png')
 IV_park_map = plt.imread('IV_park_map.png')
 
