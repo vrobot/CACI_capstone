@@ -151,11 +151,20 @@ def parse_uart(meta, sound, save_to_file):
     #print(output_time)
     return [output_name, output_time, output_gps, output_sound]
 
+
+def adjust_time(timea, timeb):
+    if ((timea - timeb) > 45000000):
+        timeb += 90000000
+    if ((timeb - timea) > 45000000):
+        timea += 90000000
+
+    return timea, timeb
 # add padding to make the timestamps line up
 #NOTE: use sound in secs not samples
 def pad_sound(time_a, sample_a, time_b, sample_b, sample_rate):
-    #if ((timea - timeb) > 45000000):
-        
+    
+    timea, timeb = adjust_time(time_a, time_b)
+
     offset = time_a - time_b
     offset *= sample_rate
     offset = int(offset)
@@ -243,8 +252,9 @@ def LST(nodes, times, v):
 # Universal Variables
 SAVE_TO_FILE = True
 READ_FROM_FILE = False
-FILE_NAME = 'test_result_22-05-22_18-40-52.csv'
+FILE_NAME = 'test_result_26-05-22_13-34-12.csv'
 SPEED_OF_SOUND = 343.0 / 111000.0
+SHOW_MAP = True
 NUM_NODES = int(sys.argv[2])
 SAMPLE_RATE = 46875
 PORT = sys.argv[1]
@@ -346,9 +356,10 @@ print('predicited longitude: ', pred_x)
 true_sound = [-119.86310, 034.41375]
 
 # BBox = (-119.86416, -119.86271, 34.41415, 34.41333) IV park
-BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
-#girsh_park_map = plt.imread('girsh_baseball_map.png')
-IV_park_map = plt.imread('IV_park_map.png')
+if SHOW_MAP:
+    BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
+    pmap = plt.imread('girsh_baseball_map.png')
+#map = plt.imread('IV_park_map.png')
 
 #print(node_locs)
 for i, n in enumerate(node_locs):
@@ -372,13 +383,14 @@ for i in range(NUM_NODES):
 #plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
 #plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
 
-plt.scatter(true_sound[0], true_sound[1], s = point_size, color = 'red', marker='o', label='True sound location')
+#plt.scatter(true_sound[0], true_sound[1], s = point_size, color = 'red', marker='o', label='True sound location')
 plt.scatter(pred_x, pred_y, s = point_size, color = 'blue', marker='X', label='Predicted sound location')
 
 #whiffs on drawn graph
-plt.scatter(-999, -999, color = 'black', marker = '$N$', label='nodes')
+if SHOW_MAP:
+    plt.scatter(-999, -999, color = 'black', marker = '$N$', label='nodes')
 
-plt.imshow(IV_park_map, zorder=0, extent = BBox, aspect= 'equal')
+    plt.imshow(pmap, zorder=0, extent = BBox, aspect= 'equal')
 
 plt.legend(loc="upper left", fontsize=font_size)
 
