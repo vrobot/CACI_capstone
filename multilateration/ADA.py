@@ -163,7 +163,7 @@ def adjust_time(timea, timeb):
 #NOTE: use sound in secs not samples
 def pad_sound(time_a, sample_a, time_b, sample_b, sample_rate):
     
-    timea, timeb = adjust_time(time_a, time_b)
+    time_a, time_b = adjust_time(time_a, time_b)
 
     offset = time_a - time_b
     offset *= sample_rate
