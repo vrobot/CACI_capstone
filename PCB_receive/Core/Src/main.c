@@ -58,7 +58,8 @@ char nmeaSnt[80];
 uint8_t GPS_latest_data[65];
 int GPSidxint = 0;
 int GPS_ready = 0;
-uint32_t endGPSPadding = 0xACACACAC;
+uint32_t startGPSPadding = 0xACACACAC;
+uint32_t endGPSPadding = 0xADADADAD;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -163,10 +164,11 @@ int main(void)
 
   while (!GPS_ready);
   uint8_t GPS_data_len = (uint8_t) GPSidxint;
-  uint8_t metaData[4+GPS_data_len];
-  memcpy(metaData, GPS_latest_data, GPS_data_len);
-  memcpy(metaData+GPS_data_len, &endGPSPadding, 4);
-  HAL_UART_Transmit(&huart1, metaData, 4+GPS_data_len, 1000);
+  uint8_t metaData[8+GPS_data_len];
+  memcpy(metaData, &startGPSPadding, 4);
+  memcpy(metaData+4, GPS_latest_data, GPS_data_len);
+  memcpy(metaData+4+GPS_data_len, &endGPSPadding, 4);
+  HAL_UART_Transmit(&huart1, metaData, 8+GPS_data_len, 1000);
   /* USER CODE END 2 */
 
   /* Infinite loop */

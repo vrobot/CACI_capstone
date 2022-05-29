@@ -28,6 +28,7 @@ random.seed(69)
 
 
 from pynmeagps import NMEAReader
+from math import radians, cos, sin, asin, sqrt
 
 
 
@@ -48,6 +49,71 @@ def twos_complement(hexstr, bits):
         value -= 1 << bits
 
     return value
+
+def GPS_distance(lat1, lat2, lon1, lon2):
+     
+    # The math module contains a function named
+    # radians which converts from degrees to radians.
+    lon1 = radians(lon1)
+    lon2 = radians(lon2)
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
+      
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+ 
+    c = 2 * asin(sqrt(a))
+    
+    # Radius of earth in kilometers. Use 3956 for miles
+    r = 6371
+      
+    # calculate the result
+    return(c * r * 1000)
+
+def get_GPS(port, baud, timeout_val):
+    ser = serial.Serial(port, baud, timeout=timeout_val)
+    blank = ''
+    
+    gps_data = blank
+
+    GPS_start = 'acacacac'
+    GPS_end = 'adadadad'
+    # read serial port until stop character is hit
+    while True:
+        input_data = ser.readline()
+        data = input_data.hex()
+
+        if data != blank:
+            #print(data)
+            gps_data = gps_data + data
+        
+        if gps_data.find(GPS_end) != -1:
+            break
+
+    raw_gps = find_str(gps_data, GPS_start, GPS_end)
+    raw_gps = raw_gps.lstrip('0')
+
+    gps_processed = NMEAReader.parse(bytes.fromhex(raw_gps).decode('utf-8'))
+
+    x = float(gps_processed.payload[2])/100
+    frac_x, whole_x = math.modf(x)
+    x = whole_x + (frac_x * 100) / 60
+
+    y = float(gps_processed.payload[0])/100
+    frac_y, whole_y = math.modf(y)
+    y = whole_y + (frac_y * 100) / 60
+
+    if gps_processed.payload[1] == 'S':
+        y = -1*y
+
+    if gps_processed.payload[3] == 'W':
+        x = -1*x
+
+    output_gps = [x, y]
+
+    return output_gps
 
 def get_uart(port, baud, timeout_val):
     
@@ -72,7 +138,7 @@ def get_uart(port, baud, timeout_val):
         data = input_data.hex()
         #data = bytes(input_data)
         if data != blank:
-            print(data)
+            #print(data)
             sound_data = sound_data + data
         
         if sound_data.find(sound_end) != -1:
@@ -130,8 +196,8 @@ def parse_uart(meta, sound, save_to_file):
     if gps_processed.payload[3] == 'W':
         x = -1*x
 
-    print(x)
-    print(y)
+    #print(x)
+    #print(y)
 
     output_gps = [x, y]
 
@@ -205,7 +271,7 @@ def cross_correlation(time_a, sample_a, time_b, sample_b, sample_rate):
 
 def LST(nodes, times, v):
 
-    print(nodes)
+    #print(nodes)
     #print(times)
 
     #print(np.array(nodes))
@@ -251,8 +317,10 @@ def LST(nodes, times, v):
 #-----------------------------------------------------------------------------
 # Universal Variables
 SAVE_TO_FILE = True
-READ_FROM_FILE = False
-FILE_NAME = 'test_result_26-05-22_13-34-12.csv'
+READ_FROM_FILE = int(sys.argv[3])
+FILE_NAME = ''
+if (READ_FROM_FILE):
+    FILE_NAME = sys.argv[4] #'34.41486_-119.7352/test_result_17-05-22_15-50-37.csv'
 SPEED_OF_SOUND = 343.0 / 111000.0
 SHOW_MAP = True
 NUM_NODES = int(sys.argv[2])
@@ -269,9 +337,13 @@ PORT = sys.argv[1]
 
 #formatting is [output_name, output_time, output_gps, output_sound]
 node_list = []
+true_sound = []
 
 if READ_FROM_FILE:
     node_list = list(csv.reader(open(FILE_NAME)))
+    true_sound = [ast.literal_eval(node_list[0][0]), ast.literal_eval(node_list[0][1])]
+    print(true_sound)
+    node_list.pop(0)
 
     for i in range(NUM_NODES):
         for j in range(4):
@@ -280,6 +352,10 @@ if READ_FROM_FILE:
             node_list[i][j] = res
 
 else:
+    print("Format: [Latititude, Longitude]")
+    true_sound = get_GPS(port=PORT, baud=115200, timeout_val=0)
+    print("True sound: [" + str(true_sound[1]) + ", " + str(true_sound[0]) + "]")
+
     for i in range(NUM_NODES):
     
         # uart input
@@ -291,9 +367,9 @@ else:
     
 
         node_list.append(parse_uart(meta, sound, SAVE_TO_FILE))
-        print('node ', str(node_list[i][0]), ' recieved')
+        print('node ', str(node_list[i][0]), ' recieved: [' + str(node_list[i][2][1]) + ", " + str(node_list[i][2][0]) + "]")
     node_list[0].append(0)
-print(node_list)
+#print(node_list)
 
 # write to file
 if SAVE_TO_FILE and not(READ_FROM_FILE):
@@ -312,6 +388,7 @@ if SAVE_TO_FILE and not(READ_FROM_FILE):
     # writing the data into the file
     with file:   
         write = csv.writer(file)
+        write.writerow(true_sound)
         write.writerows(node_list)
 
 
@@ -351,14 +428,18 @@ pred_x = pred_x / long_multiplier
 
 print('predicited latititude: ', pred_y)
 print('predicited longitude: ', pred_x)
+error = GPS_distance(pred_y, true_sound[1], pred_x, true_sound[0])
+print("====================================")
+print('ERROR DISTANCE: ', error, 'm')
+print("====================================")
 
 #x, y
-true_sound = [-119.86310, 034.41375]
+#true_sound = [-119.86310, 034.41375]
 
 # BBox = (-119.86416, -119.86271, 34.41415, 34.41333) IV park
 if SHOW_MAP:
-    BBox = (-119.87359, -119.87242, 34.42555, 34.42649) # Girsh park
-    pmap = plt.imread('girsh_baseball_map.png')
+    BBox = (-119.73578, -119.73453, 34.41449, 34.41561) # Girsh park
+    pmap = plt.imread('google_elings_park_map.JPG')
 #map = plt.imread('IV_park_map.png')
 
 #print(node_locs)
@@ -383,7 +464,7 @@ for i in range(NUM_NODES):
 #plt.scatter(node_locs[1][0], node_locs[1][1], color = 'black', marker='$B$')
 #plt.scatter(node_locs[2][0], node_locs[2][1], color = 'black', marker='$C$')
 
-#plt.scatter(true_sound[0], true_sound[1], s = point_size, color = 'red', marker='o', label='True sound location')
+plt.scatter(true_sound[0], true_sound[1], s = point_size, color = 'red', marker='o', label='True sound location')
 plt.scatter(pred_x, pred_y, s = point_size, color = 'blue', marker='X', label='Predicted sound location')
 
 #whiffs on drawn graph
@@ -396,4 +477,7 @@ plt.legend(loc="upper left", fontsize=font_size)
 
 plt.axis('off')
 
-plt.show()
+manager = plt.get_current_fig_manager()
+manager.full_screen_toggle()
+
+#plt.show()
